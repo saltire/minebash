@@ -160,29 +160,15 @@ class Chunk:
         return zip(*hmap) # the asterisk unpacks the list into arguments for the zip function
     
     
-    def get_colourmap(self):
-        hmap = self.get_heightmap()
-        bdata = self.find_tag('Blocks')
-        cmap = [] # list of rows, [x][z]
-        for x in range(self.csize):
-            row = []
-            for z in range(self.csize):
-                row.append(bdata[x * self.cheight * self.csize + z * self.cheight + hmap[x][z] - 1])
-            cmap.append(row)
-        return cmap
-
-
     def get_blocks(self):
         bdata = self.find_tag('Blocks')
         blocks = [] # list of rows, each a vertical list of blocks, [x][z][y]
         for x in range(self.csize):
             row = []
             for z in range(self.csize):
-                column = []
-                for y in range(self.cheight):
-                    column.append(bdata[x * self.cheight * self.csize + z * self.cheight + y])
-            row.append(column)
-        blocks.append(row)
+                colstart = x * self.cheight * self.csize + z * self.cheight
+                row.append(bdata[colstart:colstart + self.cheight])
+            blocks.append(row)
         return blocks
 
 
