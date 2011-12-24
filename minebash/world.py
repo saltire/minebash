@@ -46,27 +46,28 @@ class World:
             )
         
         
-    def get_chunk_list(self, list=None):
-        """Returns a list of coordinates of all existing chunks (within optional limits)."""
-        return [(cx, cz) for (cx, cz) in self.chunklist if list is None or (cx, cz) in list]
+    def get_chunk_list(self, limits=None):
+        """Returns a list of coordinates of all existing chunks (within optional chunk limits)."""
+        return self._get_coords_in_limits(self.chunklist, limits)
             
             
-    def get_chunks(self, list=None):
-        """Returns a dict of all existing chunks (within optional limits), indexed by coordinates."""
+    def get_chunks(self, limits=None):
+        """Returns a dict of all existing chunks (within optional chunk limits), indexed by coordinates."""
         chunks = {}
-        for region in self.regions.values():
-            chunks.update(region.read_chunks(list))
+        for region in self.get_regions(limits, self.rsize).values():
+            chunklist = self._get_coords_in_limits(region.get_chunk_list())
+            chunks.update(region.read_chunks(chunklist))
         return chunks
     
     
-    def get_region_list(self, list=None):
-        """Returns a list of coordinates of all existing regions (within optional limits)."""
-        return [(rx, rz) for (rx, rz) in self.regionlist if list is None or (rx, rz) in list]
+    def get_region_list(self, limits=None):
+        """Returns a list of coordinates of all existing regions (within optional chunk limits)."""
+        return self._get_coords_in_limits(self.regionlist, limits, self.rsize)
         
         
-    def get_regions(self, list=None):
-        """Returns a dict of all existing regions (within optional limits), indexed by coordinates."""
-        return dict(((rx, rz), self.regions[rx, rz]) for (rx, rz) in self.regions if list is None or (rx, rz) in list)
+    def get_regions(self, limits=None):
+        """Returns a dict of all existing regions (within optional chunk limits), indexed by coordinates."""
+        return dict(((rx, rz), self.regions[rx, rz]) for (rx, rz) in self.get_region_list(limits))
 
 
     def _read_region_list(self):
@@ -79,6 +80,15 @@ class World:
                 if r == 'r' and ext == 'mcr':
                     regionlist.append((int(rx), int(rz)))
         return regionlist
+    
+    
+    def _get_coords_in_limits(self, coords, limits=None, scale=1):
+        """Filter a list of coordinates by a n/s/e/w bounding box.
+        Coordinates are at chunk scope, divided by scale if specified."""
+        if limits is None:
+            return coords
+        n, s, e, w = [i / scale for i in limits]
+        return [(x, z) for (x, z) in coords if n <= x <= s and e <= z <= w]
         
 
 
@@ -92,14 +102,14 @@ class Region:
         
         
     def get_chunk_list(self, list=None):
-        """Returns a list of coordinates of existing chunks (within optional limits)."""
-        return [(cx, cz) for (cx, cz) in self.chunkinfo.keys() if list is None or (cx, cz) in list]
+        """Returns a list of coordinates of chunks existing in the region file."""
+        return self.chunkinfo.keys()
     
     
-    def read_chunks(self, list=None):
-        """Returns a list of all existing chunks (within optional limits), indexed by coordinates."""
+    def read_chunks(self, whitelist=None):
+        """Returns a dict of all existing chunks (within an optional whitelist), indexed by coordinates."""
         with open(self.path, 'rb') as rfile:
-            return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in self.chunkinfo.keys() if list is None or (cx, cz) in list)
+            return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in self.chunkinfo.keys() if whitelist is None or (cx, cz) in whitelist)
         
         
     def _read_chunk_info(self):

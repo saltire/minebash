@@ -19,10 +19,8 @@ class Map:
         img = Image.new('RGB', dimensions)
         pix = img.load()
         
-        regionlist = self._get_coords_in_limits(limits, self.rsize * self.csize) if limits else None
-        chunklist = self._get_coords_in_limits(limits, self.csize) if limits else None
-        
-        regions = self.world.get_regions(regionlist)
+        chunklist = self.world.get_chunk_list(limits)
+        regions = self.world.get_regions(limits)
         for rnum, ((rx, rz), region) in enumerate(sorted(regions.items())):
             print 'reading region {0}/{1} {2}...'.format(rnum + 1, len(regions), (rx, rz))
             chunks = region.read_chunks(chunklist)
@@ -66,8 +64,8 @@ class Map:
         with open(path, 'rb') as cfile:
             for line in cfile.readlines():
                 if line.strip() and line[:1] != '#':
-                    id, r, g, b, a, n = line.split()
-                    colours[int(id)] = (int(r), int(g), int(b), round(int(a) / 255.0, 2), int(n))
+                    id, r, g, b, a, n, name =line.split(',')
+                    colours[int(id)] = (int(r), int(g), int(b), float(a), int(n), name.strip())
         return colours
     
     
