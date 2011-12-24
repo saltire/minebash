@@ -92,13 +92,12 @@ class Region:
         
         
     def get_chunk_list(self, list=None):
-        """Returns a dict of all existing chunks (within optional limits), indexed by coordinates."""
+        """Returns a list of coordinates of existing chunks (within optional limits)."""
         return [(cx, cz) for (cx, cz) in self.chunkinfo.keys() if list is None or (cx, cz) in list]
     
     
     def read_chunks(self, list=None):
-        #print self.chunkinfo.keys()
-        #print [(cx, cz) for (cx, cz) in self.chunkinfo.keys() if (cx, cz) in list]
+        """Returns a list of all existing chunks (within optional limits), indexed by coordinates."""
         with open(self.path, 'rb') as rfile:
             return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in self.chunkinfo.keys() if list is None or (cx, cz) in list)
         

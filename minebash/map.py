@@ -1,6 +1,6 @@
 from PIL import Image
 
-from minebash import world
+import world
 
 class Map:
     def __init__(self, world, colours):
@@ -67,7 +67,7 @@ class Map:
             for line in cfile.readlines():
                 if line.strip() and line[:1] != '#':
                     id, r, g, b, a, n = line.split()
-                    colours[int(id)] = (int(r), int(g), int(b), round(int(a) / 255.0, 1), int(n))
+                    colours[int(id)] = (int(r), int(g), int(b), round(int(a) / 255.0, 2), int(n))
         return colours
     
     
