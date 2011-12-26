@@ -2,24 +2,33 @@ from PIL import Image
 
 import world
 
-class Map:
+class OrthoMap:
     def __init__(self, world, colours):
         self.rsize = 32
         self.csize = 16
+
         self.world = world
         self.colours = self._load_colours(colours)
         
         
     def draw_map(self, imgpath, limits=None):
-        """Draw a map of this world, within optional n/s/e/w chunk limits."""
-        n, s, e, w = self.world.get_block_edges() if limits is None else limits
+        """Draw a top-down map of this world, within optional n/s/e/w block limits."""
+        chunklist = self.world.get_chunk_list(limits)
+        cxrange = [cx for (cx, cz) in chunklist]
+        czrange = [cz for (cx, cz) in chunklist]
+        n, s, e, w = (
+            min(cxrange) * self.csize,
+            max(cxrange) * self.csize + self.csize - 1,
+            min(czrange) * self.csize,
+            max(czrange) * self.csize + self.csize - 1
+            ) if limits is None else limits
+        
         dimensions = (w - e + 1, s - n + 1)
         print n, s, e, w
         print dimensions
         img = Image.new('RGB', dimensions)
         pix = img.load()
         
-        chunklist = self.world.get_chunk_list(limits)
         regions = self.world.get_regions(limits)
         for rnum, ((rx, rz), region) in enumerate(sorted(regions.items())):
             print 'reading region {0}/{1} {2}...'.format(rnum + 1, len(regions), (rx, rz))

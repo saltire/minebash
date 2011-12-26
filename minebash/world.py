@@ -19,50 +19,23 @@ class World:
             self.chunklist.extend(region.get_chunk_list())
             
             
-    def _get_edges(self, list):
-        xrange = [x for (x, z) in list]
-        zrange = [z for (x, z) in list]
-        return min(xrange), max(xrange), min(zrange), max(zrange)
-            
-            
-    def get_region_edges(self):
-        """Returns the highest and lowest values of x and z for all existing regions."""
-        return self._get_edges(self.regionlist)
-            
-            
-    def get_chunk_edges(self):
-        """Returns the highest and lowest values of x and z for all existing chunks."""
-        return self._get_edges(self.chunklist)
-            
-            
-    def get_block_edges(self):
-        """Returns the highest and lowest values of x and z for blocks in all existing chunks."""
-        cxmin, cxmax, czmin, czmax = self.get_chunk_edges()
-        return (
-            cxmin * self.csize,
-            cxmax * self.csize + self.csize - 1,
-            czmin * self.csize,
-            czmax * self.csize + self.csize - 1
-            )
-        
-        
     def get_chunk_list(self, limits=None):
         """Returns a list of coordinates of all existing chunks (within optional chunk limits)."""
-        return self._get_coords_in_limits(self.chunklist, limits)
+        return self._get_coords_in_limits(self.chunklist, limits, self.csize)
             
             
     def get_chunks(self, limits=None):
         """Returns a dict of all existing chunks (within optional chunk limits), indexed by coordinates."""
         chunks = {}
         for region in self.get_regions(limits, self.rsize).values():
-            chunklist = self._get_coords_in_limits(region.get_chunk_list())
+            chunklist = self._get_coords_in_limits(region.get_chunk_list(), self.csize)
             chunks.update(region.read_chunks(chunklist))
         return chunks
     
     
     def get_region_list(self, limits=None):
         """Returns a list of coordinates of all existing regions (within optional chunk limits)."""
-        return self._get_coords_in_limits(self.regionlist, limits, self.rsize)
+        return self._get_coords_in_limits(self.regionlist, limits, self.rsize * self.csize)
         
         
     def get_regions(self, limits=None):
