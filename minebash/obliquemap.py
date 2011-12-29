@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw
 import map
 
 class ObliqueMap(map.Map):
-    def draw_map(self, imgpath, rotate=0, limits=None):
+    def _generate_map_data(self, rotate=0, limits=None):
         """Draw an angled oblique map of this world, within optional n/s/e/w block limits.
         Default rotation has NE at the top, rotate argument = number of clockwise quarter-turns."""
         chunklist = self.world.get_chunk_list(limits)
@@ -20,9 +20,7 @@ class ObliqueMap(map.Map):
         # diagonal distance between opposite extremes
         width = (abs(right[0] - left[0]) + abs(right[1] - left[1]) + 2)
         height = (abs(bottom[0] - top[0]) + abs(bottom[1] - top[1]) + 2) + self.height - 1
-        
-        img = Image.new('RGB', (width, height))
-        pix = [0] * width * height
+        data = [0] * width * height
         
         regions = self.world.get_regions(limits)
         for rnum, (rx, rz) in enumerate(self._order_coords(regions.keys(), rotate)):
@@ -41,13 +39,12 @@ class ObliqueMap(map.Map):
                                 if blocks[x][z][y]:
                                     colour = self.colours[blocks[x][z][y]][:3]
                                     #pix[px + pyy * width] = colour
-                                    points = (px, pyy), (px + 1, pyy), (px, pyy + 1), (px + 1, pyy + 1)
-                                    #points = (px, pyy), (px, pyy + 1)
-                                    for xx, yy in points:
-                                        pix[xx + yy * width] = colour
+                                    pixels = (px, pyy), (px + 1, pyy), (px, pyy + 1), (px + 1, pyy + 1) # 4 pixels for each block
+                                    #pixels = (px, pyy), (px, pyy + 1)
+                                    for xx, yy in pixels:
+                                        data[xx + yy * width] = colour
                                         
-        img.putdata(pix)
-        img.save(imgpath)
+        return (width, height), data
         
         
     def _get_diagonal_extremes(self, coords):

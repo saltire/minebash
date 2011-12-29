@@ -85,6 +85,25 @@ class Region:
             return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in self.chunkinfo.keys() if whitelist is None or (cx, cz) in whitelist)
         
         
+    def read_all_chunks(self, whitelist=None):
+        """Returns a dict of all existing chunks (within an optional whitelist), indexed by coordinates.
+        This method loads all chunks in a single read, rather than seeking to each one individually."""
+        with open(self.path, 'rb') as rfile:
+            rfile.seek(8192)
+            cdata = rfile.read()
+        
+        chunks = {}
+        for (cx, cz), cinfo in self.chunkinfo.items():
+            cstart = (cinfo['sectornum'] - 2) * 4096
+            cend = (cinfo['sectornum'] - 2 + cinfo['sectorlength']) * 4096
+            chunk = cdata[cstart:cend]
+            length, version = struct.unpack('>ib', chunk[:5])
+            if version == 2:
+                chunks[cx, cz] = Chunk(zlib.decompress(chunk[5:length + 4]))
+                
+        return dict(((cx, cz), chunks[cx, cz]) for (cx, cz) in chunks.keys() if whitelist is None or (cx, cz) in whitelist)
+    
+    
     def _read_chunk_info(self):
         """Returns a dict of chunks that exist in the region file, indexed by coords,
         and containing the modification time and sector offset."""

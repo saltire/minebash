@@ -1,3 +1,5 @@
+from PIL import Image
+
 import world
 
 class Map:
@@ -8,6 +10,15 @@ class Map:
         
         self.world = world
         self.colours = self._load_colours(colours)
+        
+        
+    def draw_map(self, imgpath, rotate=0, limits=None):
+        """Gets map data from a subclass method, and saves it to an image file."""
+        dimensions, mapdata = self._generate_map_data(rotate, limits)
+        img = Image.new('RGB', dimensions)
+        img.putdata(mapdata)
+        img.save(imgpath)
+        print 'saved image to', imgpath
         
     
     def draw_chunk_map(self, imgpath, limits=None):

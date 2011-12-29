@@ -1,18 +1,14 @@
-from PIL import Image
-
 import map
 
 class OrthoMap(map.Map):
-    def draw_map(self, imgpath, rotate=0, limits=None):
+    def _generate_map_data(self, rotate=0, limits=None):
         """Draw a top-down map of this world, within optional n/s/e/w block limits.
         Defaults to N at the top. Rotation not implemented yet."""
         chunklist = self.world.get_chunk_list(limits)
         n, s, e, w = self._get_extremes(chunklist, self.csize) if limits is None else limits
         width, height = w - e + 1, s - n + 1
+        data = [0] * width * height
 
-        img = Image.new('RGB', (width, height))
-        pix = [0] * width * height
-        
         regions = self.world.get_regions(limits)
         for rnum, ((rx, rz), region) in enumerate(sorted(regions.items())):
             print 'reading region {0}/{1} {2}...'.format(rnum + 1, len(regions), (rx, rz))
@@ -28,10 +24,9 @@ class OrthoMap(map.Map):
                         y = hmap[x][z] - 1
                         colour = self._adjust_colour(self._get_alpha_colour(blocks[x][z], y), y) 
                         #colour = self._adjust_colour(self.colours[blocks[x][z][y]], y) # no alpha
-                        pix[px + py * width] = colour
+                        data[px + py * width] = colour
                         
-        img.putdata(pix)                        
-        img.save(imgpath)
+        return (width, height), data
         
         
     def _adjust_colour(self, colour, lum):
