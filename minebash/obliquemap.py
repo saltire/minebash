@@ -1,46 +1,28 @@
-from PIL import Image
+from PIL import Image, ImageDraw
 
-import world
+import map
 
-class ObliqueMap:
-    def __init__(self, world, colours):
-        self.rsize = 32
-        self.csize = 16
-        self.height = 128
-        
-        self.world = world
-        self.colours = self._load_colours(colours)
-        
-    
+class ObliqueMap(map.Map):
     def draw_map(self, imgpath, rotate=0, limits=None):
-        """Draw a diagonal map of this world, within optional n/s/e/w block limits.
+        """Draw an angled oblique map of this world, within optional n/s/e/w block limits.
         Default rotation has NE at the top, rotate argument = number of clockwise quarter-turns."""
         chunklist = self.world.get_chunk_list(limits)
-        cxrange = [cx for (cx, cz) in chunklist]
-        czrange = [cz for (cx, cz) in chunklist]
-        # highest and lowest values on each axis
-        n, s, e, w = (
-            min(cxrange) * self.csize,
-            max(cxrange) * self.csize + self.csize - 1,
-            min(czrange) * self.csize,
-            max(czrange) * self.csize + self.csize - 1
-            ) if limits is None else limits
+        n, s, e, w = self._get_extremes(chunklist, self.csize) if limits is None else limits
         
-        # the top and left chunks on the map at this rotation
-        cext = self._rotate(self._get_extremes(chunklist), rotate)
-        # the top and left blocks within any given chunk
+        # the outermost chunks on the map at this rotation
+        cext = self._rotate(self._get_diagonal_extremes(chunklist), rotate)
+        # the outermost blocks within any given chunk
         ccorners = [(0, 0), (0, self.csize - 1), (self.csize - 1, self.csize - 1), (self.csize - 1, 0)]
         bext = self._rotate(ccorners, rotate)
-        # the top and left blocks on the map
+        # the outermost blocks on the map
         top, left, bottom, right = [(cext[x][0] * self.csize + bext[x][0], cext[x][1] * self.csize + bext[x][1]) for x in range(4)]
         
         # diagonal distance between opposite extremes
         width = (abs(right[0] - left[0]) + abs(right[1] - left[1]) + 2)
         height = (abs(bottom[0] - top[0]) + abs(bottom[1] - top[1]) + 2) + self.height - 1
-        print (width, height)
         
         img = Image.new('RGB', (width, height))
-        pix = img.load()
+        pix = [0] * width * height
         
         regions = self.world.get_regions(limits)
         for rnum, (rx, rz) in enumerate(self._order_coords(regions.keys(), rotate)):
@@ -55,16 +37,22 @@ class ObliqueMap:
                         if n <= bx <= s and e <= bz <= w:
                             px, py = self._find_point((bx, bz), left, top, rotate)
                             for y in range(self.height):
-                                pixel = px, py + self.height - y - 1
+                                pyy = py + self.height - y - 1
                                 if blocks[x][z][y]:
-                                    pix[px, py + self.height - y] = self._get_alpha_colour(blocks[x][z], y)
-                                    pix[px, py + self.height - y - 1] = self._get_alpha_colour(blocks[x][z], y)
-                        
+                                    colour = self.colours[blocks[x][z][y]][:3]
+                                    #pix[px + pyy * width] = colour
+                                    points = (px, pyy), (px + 1, pyy), (px, pyy + 1), (px + 1, pyy + 1)
+                                    #points = (px, pyy), (px, pyy + 1)
+                                    for xx, yy in points:
+                                        pix[xx + yy * width] = colour
+                                        
+        img.putdata(pix)
         img.save(imgpath)
         
         
-    def _get_extremes(self, coords):
-        """Given a set of coordinates, return the diagonal extremes."""
+    def _get_diagonal_extremes(self, coords):
+        """Given a set of coordinates, return the diagonal extremes
+        (northeasternmost, etc)."""
         xrange = [x for (x, z) in coords]
         zrange = [z for (x, z) in coords]
         xmin = min(xrange)
@@ -87,14 +75,19 @@ class ObliqueMap:
         return (a, b, c, d)[rotate:] + (a, b, c, d)[:rotate]
     
     
-    def _order_coords(self, coords, rotate):
+    def _order_coords(self, coords, rotate, reverse=0):
         """Order a set of coordinates so that they proceed from back to front,
-        according to rotation."""
+        according to rotation (or front to back if reverse is true)."""
+        # list of rotations in which x and z axes should be drawn in ascending order
+        # draw from back to front by default, or front to back if reverse is true
+        xasc = [2, 3] if reverse else [0, 1]
+        zasc = [1, 2] if reverse else [0, 3]
+
         xrange = set([x for (x, z) in coords])
         zrange = set([z for (x, z) in coords])
         return [(x, z)
-            for x in (sorted(xrange) if rotate in [0, 1] else reversed(sorted(xrange)))
-                for z in (sorted(zrange) if rotate in [0, 3] else reversed(sorted(zrange)))
+            for x in (sorted(xrange) if rotate in xasc else reversed(sorted(xrange)))
+                for z in (sorted(zrange) if rotate in zasc else reversed(sorted(zrange)))
                     if (x, z) in coords]
 
 
@@ -114,29 +107,4 @@ class ObliqueMap:
             py = -py
 
         return (px, py)
-
-
-    def _load_colours(self, path):
-        """Grab block colours from a file."""
-        colours = {}
-        with open(path, 'rb') as cfile:
-            for line in cfile.readlines():
-                if line.strip() and line[:1] != '#':
-                    id, r, g, b, a, n, name =line.split(',')
-                    colours[int(id)] = (int(r), int(g), int(b), float(a), int(n), name.strip())
-        return colours
-    
-    
-    def _get_alpha_colour(self, column, height):
-        """If a block is partially transparent, combine its colour with that of the block below."""
-        r, g, b, a = self.colours[column[height]][:4]
-        if a < 1:
-            r2, g2, b2 = self._get_alpha_colour(column, height - 1)
-            r, g, b = (
-                int(r * a + r2 * (1 - a)),
-                int(g * a + g2 * (1 - a)),
-                int(b * a + b2 * (1 - a))
-                )
-        return r, g, b
-
 

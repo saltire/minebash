@@ -1,33 +1,17 @@
 from PIL import Image
 
-import world
+import map
 
-class OrthoMap:
-    def __init__(self, world, colours):
-        self.rsize = 32
-        self.csize = 16
-
-        self.world = world
-        self.colours = self._load_colours(colours)
-        
-        
-    def draw_map(self, imgpath, limits=None):
-        """Draw a top-down map of this world, within optional n/s/e/w block limits."""
+class OrthoMap(map.Map):
+    def draw_map(self, imgpath, rotate=0, limits=None):
+        """Draw a top-down map of this world, within optional n/s/e/w block limits.
+        Defaults to N at the top. Rotation not implemented yet."""
         chunklist = self.world.get_chunk_list(limits)
-        cxrange = [cx for (cx, cz) in chunklist]
-        czrange = [cz for (cx, cz) in chunklist]
-        n, s, e, w = (
-            min(cxrange) * self.csize,
-            max(cxrange) * self.csize + self.csize - 1,
-            min(czrange) * self.csize,
-            max(czrange) * self.csize + self.csize - 1
-            ) if limits is None else limits
-        
-        dimensions = (w - e + 1, s - n + 1)
-        print n, s, e, w
-        print dimensions
-        img = Image.new('RGB', dimensions)
-        pix = img.load()
+        n, s, e, w = self._get_extremes(chunklist, self.csize) if limits is None else limits
+        width, height = w - e + 1, s - n + 1
+
+        img = Image.new('RGB', (width, height))
+        pix = [0] * width * height
         
         regions = self.world.get_regions(limits)
         for rnum, ((rx, rz), region) in enumerate(sorted(regions.items())):
@@ -40,44 +24,21 @@ class OrthoMap:
                 for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                     bx, bz = (cx * self.csize + x, cz * self.csize + z)
                     if n <= bx <= s and e <= bz <= w:
-                        pixel = (w - bz, bx - n)
+                        px, py = w - bz, bx - n
                         y = hmap[x][z] - 1
                         colour = self._adjust_colour(self._get_alpha_colour(blocks[x][z], y), y) 
                         #colour = self._adjust_colour(self.colours[blocks[x][z][y]], y) # no alpha
-                        pix[pixel] = colour
+                        pix[px + py * width] = colour
                         
+        img.putdata(pix)                        
         img.save(imgpath)
         
         
-    def draw_chunk_map(self, imgpath, limits=None):
-        """Draws a small map showing all chunks present."""
-        n, s, e, w = self.world.get_chunk_edges()
-        dimensions = (w - e + 1, s - n + 1)
-        print n, s, e, w
-        print dimensions
-        img = Image.new('RGB', dimensions)
-        pix = img.load()
-        
-        for (rx, rz), region in sorted(self.world.get_regions().items()):
-            print 'reading region', (rx, rz), '...'
-            for (cx, cz), chunk in region.read_chunks().items():
-                pixel = (w - cz, cx - n)
-                pix[pixel] = (255, 255, 255)
+    def _adjust_colour(self, colour, lum):
+        """Lighten or darken a colour, depending on a luminance value."""
+        return tuple([channel + min(channel, 256 - channel) * (lum - 128) / 256 for channel in colour[:3]])
+    
 
-        img.save(imgpath)
-        
-        
-    def _load_colours(self, path):
-        """Grab block colours from a file."""
-        colours = {}
-        with open(path, 'rb') as cfile:
-            for line in cfile.readlines():
-                if line.strip() and line[:1] != '#':
-                    id, r, g, b, a, n, name =line.split(',')
-                    colours[int(id)] = (int(r), int(g), int(b), float(a), int(n), name.strip())
-        return colours
-    
-    
     def _get_alpha_colour(self, column, height):
         """If a block is partially transparent, combine its colour with that of the block below."""
         r, g, b, a = self.colours[column[height]][:4]
@@ -89,20 +50,4 @@ class OrthoMap:
                 int(b * a + b2 * (1 - a))
                 )
         return r, g, b
-    
-    
-    def _adjust_colour(self, colour, lum):
-        """Lighten or darken a colour, depending on a luminance value."""
-        return tuple([channel + min(channel, 256 - channel) * (lum - 128) / 256 for channel in colour[:3]])
-    
-    
-    def _get_coords_in_limits(self, limits=None, scale=1):
-        """Returns all coordinates within a given rectangle,
-        defined inclusively by n/s/e/w limits."""
-        if limits is None:
-            return None
-        
-        n, s, e, w = limits
-        return [(x, z) for x in range(n / scale, s / scale + 1) for z in range(e / scale, w / scale + 1)]
-        
 
