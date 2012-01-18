@@ -22,6 +22,20 @@ class Map:
         print 'saved image to', imgpath
         
     
+    def draw_region(self, (rx, rz)):
+        """Draw a single region; that is, the data from a single region file."""
+        rbsize = self.csize * self.rsize
+        crop = rx * rbsize, (rx + 1) * rbsize - 1, rz * rbsize, (rz + 1) * rbsize - 1
+        return self.draw_map(crop)
+    
+    
+    def draw_region_at_point(self, (x, z)):
+        """Determine which region file holds a certain block, and draw that region."""
+        rbsize = self.csize * self.rsize
+        rx, rz = x / rbsize, z / rbsize
+        return self.draw_region((rx, rz))
+        
+    
     def draw_chunk_map(self, imgpath, limits=None):
         """Draws a small map showing all chunks present."""
         n, s, e, w = self.world.get_chunk_edges()
