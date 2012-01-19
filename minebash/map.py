@@ -82,4 +82,23 @@ class Map:
                     colours[int(id)] = (int(r), int(g), int(b), float(a), int(n), name.strip())
         return colours
     
+    def _adjust_colour(self, colour, lum, amount=1.5, offset=32):
+        """Lighten or darken a colour, depending on a luminance value."""
+        return tuple(
+            int(channel + min(channel, 256 - channel) * (lum - 128 + offset) / 256 * amount)
+            for channel in colour[:3]
+            ) + colour[3:]
     
+
+    def _combine_alpha(self, (rf, gf, bf, af), (rb, gb, bb), a=1.0):
+        """Composite an RGBA (front) colour on top of an RGB (back) colour, and return RGB.
+        Takes an optional alpha argument to apply to the front colour."""
+        if af == 1 and a == 1:
+            return (rf, gf, bf)
+        a *= af
+        return (
+            int(rf * a + rb * (1 - a)),
+            int(gf * a + gb * (1 - a)),
+            int(bf * a + bb * (1 - a))
+            )
+

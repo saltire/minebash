@@ -26,27 +26,22 @@ class OrthoMap(map.Map):
                         #data[px + py * width] = colour
                         for y in reversed(range(self.height)):
                             if blocks[x][z][y]:
-                                colour = self._adjust_colour(self._get_alpha_colour(blocks[x][z], y), y)
+                                colour = self._get_block_colour(blocks[x][z], y)
                                 data[px + py * width] = colour
                                 break
                         
         return (width, height), data
         
         
-    def _adjust_colour(self, colour, lum):
-        """Lighten or darken a colour, depending on a luminance value."""
-        return tuple([channel + min(channel, 256 - channel) * (lum - 128) / 256 for channel in colour[:3]])
-    
-
-    def _get_alpha_colour(self, column, height):
+    def _get_block_colour(self, column, y):
         """If a block is partially transparent, combine its colour with that of the block below."""
-        r, g, b, a = self.colours[column[height]][:4]
-        if a < 1:
-            r2, g2, b2 = self._get_alpha_colour(column, height - 1)
-            r, g, b = (
-                int(r * a + r2 * (1 - a)),
-                int(g * a + g2 * (1 - a)),
-                int(b * a + b2 * (1 - a))
-                )
-        return r, g, b
+        top = self.colours[column[y]][:4]
+        
+        if top[3] < 1:
+            bottom = self._get_block_colour(column, y - 1) if y > 0 else (0, 0, 0)
+            colour = self._combine_alpha(top, bottom)
+        else:
+            colour = top[:3]
+            
+        return self._adjust_colour(colour, y)
 
