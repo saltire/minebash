@@ -81,6 +81,7 @@ class Map:
                     id, r, g, b, a, n, name =line.split(',')
                     colours[int(id)] = (int(r), int(g), int(b), float(a), int(n), name.strip())
         return colours
+
     
     def _adjust_colour(self, colour, lum, amount=1.5, offset=32):
         """Lighten or darken a colour, depending on a luminance value."""
