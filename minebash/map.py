@@ -16,7 +16,7 @@ class Map:
     def draw_map(self, imgpath, limits=None):
         """Gets map data from a subclass method, and saves it to an image file."""
         dimensions, mapdata = self._generate_map_data(limits)
-        img = Image.new('RGB', dimensions)
+        img = Image.new('RGBA', dimensions)
         img.putdata(mapdata)
         img.save(imgpath)
         print 'saved image to', imgpath
@@ -91,15 +91,16 @@ class Map:
             ) + colour[3:]
     
 
-    def _combine_alpha(self, (rf, gf, bf, af), (rb, gb, bb), a=255):
-        """Composite an RGBA (front) colour on top of an RGB (back) colour, and return RGB.
+    def _combine_alpha(self, (rf, gf, bf, af), (rb, gb, bb, ab), a=255):
+        """Composite an RGBA (front) colour on top of an RGB (back) colour.
         Takes an optional alpha argument to apply to the front colour."""
         if af == a == 255:
-            return (rf, gf, bf)
-        a *= af / 255
+            return (rf, gf, bf, af)
+        af *= a / 255
         return (
-            int((rf * a + rb * (255 - a)) / 255),
-            int((gf * a + gb * (255 - a)) / 255),
-            int((bf * a + bb * (255 - a)) / 255)
+            (rf * af + rb * ab * (255 - af) / 255) / 255,
+            (gf * af + gb * ab * (255 - af) / 255) / 255,
+            (bf * af + bb * ab * (255 - af) / 255) / 255,
+            af + ab - af * ab / 255
             )
 
