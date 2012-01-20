@@ -79,27 +79,27 @@ class Map:
             for line in cfile.readlines():
                 if line.strip() and line[:1] != '#':
                     id, r, g, b, a, n, name =line.split(',')
-                    colours[int(id)] = (int(r), int(g), int(b), float(a), int(n), name.strip())
+                    colours[int(id)] = (int(r), int(g), int(b), int(a), int(n), name.strip())
         return colours
 
     
     def _adjust_colour(self, colour, lum, amount=1.5, offset=32):
         """Lighten or darken a colour, depending on a luminance value."""
         return tuple(
-            int(channel + min(channel, 256 - channel) * (lum - 128 + offset) / 256 * amount)
+            int(channel + min(channel, 255 - channel) * (lum - 128 + offset) / 255 * amount)
             for channel in colour[:3]
             ) + colour[3:]
     
 
-    def _combine_alpha(self, (rf, gf, bf, af), (rb, gb, bb), a=1.0):
+    def _combine_alpha(self, (rf, gf, bf, af), (rb, gb, bb), a=255):
         """Composite an RGBA (front) colour on top of an RGB (back) colour, and return RGB.
         Takes an optional alpha argument to apply to the front colour."""
-        if af == 1 and a == 1:
+        if af == a == 255:
             return (rf, gf, bf)
-        a *= af
+        a *= af / 255
         return (
-            int(rf * a + rb * (1 - a)),
-            int(gf * a + gb * (1 - a)),
-            int(bf * a + bb * (1 - a))
+            int((rf * a + rb * (255 - a)) / 255),
+            int((gf * a + gb * (255 - a)) / 255),
+            int((bf * a + bb * (255 - a)) / 255)
             )
 

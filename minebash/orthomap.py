@@ -37,7 +37,7 @@ class OrthoMap(map.Map):
         """If a block is partially transparent, combine its colour with that of the block below."""
         top = self.colours[column[y]][:4]
         
-        if top[3] < 1:
+        if top[3] < 255:
             bottom = self._get_block_colour(column, y - 1) if y > 0 else (0, 0, 0)
             colour = self._combine_alpha(top, bottom)
         else:
