@@ -15,10 +15,8 @@ class Map:
         
     def draw_map(self, imgpath, limits=None):
         """Gets map data from a subclass method, and saves it to an image file."""
-        dimensions, mapdata = self._generate_map_data(limits)
-        img = Image.new('RGBA', dimensions)
-        img.putdata(mapdata)
-        img.save(imgpath)
+        image = self._generate_map_data(limits)
+        image.save(imgpath)
         print 'saved image to', imgpath
         
     

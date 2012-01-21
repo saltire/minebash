@@ -19,7 +19,9 @@ class ObliqueMap(map.Map):
         # diagonal distance between opposite extremes
         width = (abs(right[0] - left[0]) + abs(right[1] - left[1]) + 2)
         height = (abs(bottom[0] - top[0]) + abs(bottom[1] - top[1]) + 2) + self.height - 1
-        data = [(0, 0, 0, 0)] * width * height
+
+        image = Image.new('RGBA', (width, height))
+        pixels = image.load()
         
         regions = self.world.get_regions(limits)
         for rnum, (rx, rz) in enumerate(self._order_coords(regions.keys())):
@@ -38,13 +40,12 @@ class ObliqueMap(map.Map):
                                 py -= 1
                                 if blocks[x][z][y]:
                                     colour = self.colours[blocks[x][z][y]][:4]
-                                    #pix[px + pyy * width] = colour # 1 pixel for each block
-                                    #pixels = (px, pyy), (px, pyy + 1) # 2 pixels for each block
-                                    pixels = (px, py), (px + 1, py), (px, py + 1), (px + 1, py + 1) # 4 pixels for each block
-                                    for xx, yy in pixels:
-                                        data[xx + yy * width] = self._adjust_colour(self._combine_alpha(colour, data[xx + yy * width]), y)
+                                    #data[px, py] = colour # 1 pixel for each block
+                                    #for xx, yy in (px, pyy), (px, pyy + 1): # 2 pixels for each block
+                                    for xx, yy in (px, py), (px + 1, py), (px, py + 1), (px + 1, py + 1): # 4 pixels for each block
+                                        pixels[xx, yy] = self._adjust_colour(self._combine_alpha(colour, pixels[xx, yy]), y)
                                         
-        return (width, height), data
+        return image
         
         
     def _get_diagonal_extremes(self, coords):

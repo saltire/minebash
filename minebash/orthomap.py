@@ -1,3 +1,5 @@
+from PIL import Image, ImageDraw
+
 import map
 
 class OrthoMap(map.Map):
@@ -7,7 +9,9 @@ class OrthoMap(map.Map):
         chunklist = self.world.get_chunk_list(limits)
         n, s, e, w = self._get_extremes(chunklist, self.csize) if limits is None else limits
         width, height = w - e + 1, s - n + 1
-        data = [0] * width * height
+
+        image = Image.new('RGBA', (width, height))
+        pixels = image.load()
 
         regions = self.world.get_regions(limits)
         for rnum, ((rx, rz), region) in enumerate(sorted(regions.items())):
@@ -16,21 +20,17 @@ class OrthoMap(map.Map):
             print 'drawing blocks in', len(chunks), 'chunks...'
             for (cx, cz), chunk in chunks.items():
                 blocks = chunk.get_blocks()
-                #hmap = chunk.get_heightmap()
                 for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                     bx, bz = (cx * self.csize + x, cz * self.csize + z)
                     if n <= bx <= s and e <= bz <= w:
                         px, py = w - bz, bx - n
-                        #y = hmap[x][z] - 1
-                        #colour = self._adjust_colour(self._get_alpha_colour(blocks[x][z], y), y) 
-                        #data[px + py * width] = colour
                         for y in reversed(range(self.height)):
                             if blocks[x][z][y]:
                                 colour = self._get_block_colour(blocks[x][z], y)
-                                data[px + py * width] = colour
+                                pixels[px, py] = colour
                                 break
                         
-        return (width, height), data
+        return image
         
         
     def _get_block_colour(self, column, y):
@@ -38,10 +38,10 @@ class OrthoMap(map.Map):
         top = self.colours[column[y]][:4]
         
         if top[3] < 255:
-            bottom = self._get_block_colour(column, y - 1) if y > 0 else (0, 0, 0)
+            bottom = self._get_block_colour(column, y - 1) if y > 0 else (0, 0, 0, 0)
             colour = self._combine_alpha(top, bottom)
         else:
-            colour = top[:3]
+            colour = top
             
         return self._adjust_colour(colour, y)
 
