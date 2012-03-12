@@ -28,7 +28,8 @@ class ObliqueMap(map.Map):
             print 'reading region {0}/{1} {2}...'.format(rnum + 1, len(regions), (rx, rz))
             chunks = regions[rx, rz].read_chunks(chunklist)
             print 'drawing blocks in', len(chunks), 'chunks...'
-            for (cx, cz) in self._order_coords(chunks.keys()):
+            for cnum, (cx, cz) in enumerate(self._order_coords(chunks.keys())):
+                print 'drawing region {0}/{1} chunk {2}/{3}'.format(rnum + 1, len(regions), cnum + 1, len(chunks))
                 blocks = chunks[cx, cz].get_blocks()
                 for x in range(self.csize) if self.rotate in [0, 1] else reversed(range(self.csize)):
                     for z in range(self.csize) if self.rotate in [0, 3] else reversed(range(self.csize)):

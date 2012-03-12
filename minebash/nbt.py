@@ -2,7 +2,7 @@ import struct
 
 class NBT:
     def __init__(self, data):
-        """Fill self.tags with all the tags in the gzipped NBT file at the given path."""
+        """Fill self.tags with all the tags in the given NBT data string."""
         self.types = [
             'End',
             'Byte',
@@ -14,7 +14,8 @@ class NBT:
             'Byte Array',
             'String',
             'List',
-            'Compound'
+            'Compound',
+            'Integer Array'
             ]
 
         self.data = data
@@ -72,7 +73,7 @@ class NBT:
 
         elif type == 7: # byte array
             length = struct.unpack('>i', self._read(4))[0]
-            return struct.unpack_from('>{0}b'.format(length), self._read(length))
+            return struct.unpack('>{0}b'.format(length), self._read(length))
 
         elif type == 8: # string
             length = struct.unpack('>h', self._read(2))[0]
@@ -95,6 +96,9 @@ class NBT:
                 tag = self._get_next_tag()
             return compound
         
+        elif type == 11: # integer array
+            length = struct.unpack('>i', self._read(4))[0]
+            return struct.unpack('>{0}i'.format(length), self._read(length * 4))
         
         
 class NBTFile(NBT):

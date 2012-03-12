@@ -24,7 +24,7 @@ class Map:
         """Draw a single region; that is, the data from a single region file."""
         rbsize = self.csize * self.rsize
         crop = rx * rbsize, (rx + 1) * rbsize - 1, rz * rbsize, (rz + 1) * rbsize - 1
-        return self.draw_map(crop)
+        return self._generate_map_data(crop)
     
     
     def draw_region_at_point(self, (x, z)):
@@ -36,17 +36,15 @@ class Map:
     
     def draw_chunk_map(self, imgpath, limits=None):
         """Draws a small map showing all chunks present."""
-        n, s, e, w = self.world.get_chunk_edges()
+        w, e, n, s = self.world.get_chunk_edges()
         dimensions = (w - e + 1, s - n + 1)
-        print n, s, e, w
-        print dimensions
         img = Image.new('RGB', dimensions)
         pix = img.load()
         
         for (rx, rz), region in sorted(self.world.get_regions().items()):
             print 'reading region', (rx, rz), '...'
             for (cx, cz), chunk in region.read_chunks().items():
-                pixel = (w - cz, cx - n)
+                pixel = (cx - w, cz - n)
                 pix[pixel] = (255, 255, 255)
 
         img.save(imgpath)
