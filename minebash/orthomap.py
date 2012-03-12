@@ -25,8 +25,8 @@ class OrthoMap(map.Map):
                     if w <= bx <= e and n <= bz <= s:
                         px, py = bx - w, bz - n
                         for y in reversed(range(self.height)):
-                            if blocks[x][z][y]:
-                                colour = self._get_block_colour(blocks[x][z], y)
+                            if blocks[x, z, y]:
+                                colour = self._get_block_colour(blocks[x, z, :], y)
                                 pixels[px, py] = colour
                                 break
                         

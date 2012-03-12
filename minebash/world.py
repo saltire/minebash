@@ -2,6 +2,8 @@ import os
 import struct
 import zlib
 
+import numpy
+
 import nbt
 
 
@@ -230,6 +232,24 @@ class AnvilChunk(Chunk):
         
         
     def get_blocks(self):
+        blocks = numpy.zeros((16, 16, 256), numpy.int16) # x, z, y
+        sections = {}
+        for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
+            sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
+        
+        for x in range(self.csize):
+            for z in range(self.csize):
+                for s, section in sections.items():
+                    sya = s * self.secheight
+                    syb = sya + self.secheight
+                    start = self.csize * z + x
+                    # get a Y column from data stored in YZX order
+                    blocks[x, z, sya:syb] = section[start:start + self.secheight * self.csize * self.csize:self.csize * self.csize]
+        
+        return blocks
+
+    
+    def get_blocks_old(self):
         blocks = [] # list of rows, columns, blocks, [x][z][y]
         sections = {}
         for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
@@ -248,7 +268,3 @@ class AnvilChunk(Chunk):
         
         return blocks
 
-
-#reg = AnvilRegion('d:\\games\\Minecraft\\server\\loreland', (0, 0))
-#chunks = reg.read_chunks()
-#print chunks[0, 0].get_blocks()
