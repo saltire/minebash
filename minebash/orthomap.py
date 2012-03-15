@@ -31,6 +31,47 @@ class OrthoMap(map.Map):
                                 break
                         
         return image
+    
+    
+    def _generate_region_map(self, region, bcrop=None):
+        """Generates a map of a region. The drawn blocks may be cropped,
+        but the image is always the exact size of a region."""
+        size = self.rsize * self.csize
+        image = Image.new('RGBA', (size, size))
+        pixels = image.load()
+        w, e, n, s = bcrop if bcrop else (0, size - 1, 0, size - 1)
+        
+        chunks = region.read_chunks(bcrop)
+        print 'drawing blocks in', len(chunks), 'chunks...'
+        for (cx, cz), chunk in chunks.iteritems():
+            blocks = chunk.get_blocks()
+            for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
+                bx, bz = (cx * self.csize + x, cz * self.csize + z)
+                if w <= bx <= e and n <= bz <= s:
+                    for y in reversed(range(self.height)):
+                        if blocks[x, z, y]:
+                            colour = self._get_block_colour(blocks[x, z, :], y)
+                            pixels[x, y] = colour
+                            break
+        return image
+    
+    
+    def _generate_region_heightmap(self, region, bcrop=None):
+        size = self.rsize * self.csize
+        image = Image.new('RGBA', (size, size))
+        pixels = image.load()
+        w, e, n, s = bcrop if bcrop else (0, size - 1, 0, size - 1)
+        
+        chunks = region.read_chunks(bcrop)
+        print 'drawing blocks in', len(chunks), 'chunks...'
+        for (cx, cz), chunk in chunks.iteritems():
+            hmap = chunk.get_heightmap()
+            for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
+                bx, bz = (cx * self.csize + x, cz * self.csize + z)
+                if w <= bx <= e and n <= bz <= s:
+                    pixels[x, y] = [hmap[x, y]] * 3
+        return image
+                    
         
         
     def _get_block_colour(self, column, y):

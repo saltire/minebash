@@ -1,6 +1,7 @@
 import os
 import sys
 
+from PySide import QtCore
 from PySide import QtGui
 from PIL import Image
 
@@ -18,6 +19,9 @@ class MineBash(QtGui.QWidget):
         self.init_ui()
         
         self.draw_map()
+        
+        self.selected = set()
+        self.paint = None
         
         
     def init_ui(self):
@@ -41,14 +45,17 @@ class MineBash(QtGui.QWidget):
 
         self.labels = {}
         for label in ('Region', 'Chunk', 'Block'):
-            self.labels[label] = QtGui.QLabel('')
+            self.labels[label] = QtGui.QLabel('{0}:'.format(label))
             self.labels[label].setMinimumSize(80, 40)
             framelayout.addWidget(self.labels[label])
-        
-        generate = QtGui.QPushButton('Generate', self)
-        generate.clicked.connect(lambda: self.draw_map(1))
+            
+        self.selectlabel = QtGui.QLabel('Chunks selected:')
+        framelayout.addWidget(self.selectlabel)
         
         framelayout.addStretch()
+
+        generate = QtGui.QPushButton('Generate', self)
+        generate.clicked.connect(lambda: self.draw_map(1))
         framelayout.addWidget(generate)
         
         
@@ -78,8 +85,8 @@ class MineBash(QtGui.QWidget):
         
         
     def clear_labels(self):
-        for label in self.labels.values():
-            label.setText('')
+        for text, label in self.labels.items():
+            label.setText('{0}:'.format(text))
         
         
     def update_labels(self, x, z):
@@ -89,7 +96,29 @@ class MineBash(QtGui.QWidget):
         self.labels['Chunk'].setText('Chunk: {0}, {1}'.format(cx, cz))
         self.labels['Region'].setText('Region: {0}, {1}'.format(rx, rz))
         
+        
+    def toggle_select(self, (x, z)):
+        csize = self.world.csize
+        cx, cz = x / csize, z / csize
 
+        if (cx, cz) in self.selected and not self.paint == 1:
+            self.selected.remove((cx, cz))
+            self.scene.removeItem(self.scene.itemAt(cx * csize, cz * csize))
+            self.paint = 0
+            
+        elif (cx, cz) not in self.selected and not self.paint == 0:
+            self.selected.add((cx, cz))
+       
+            sq = QtGui.QGraphicsRectItem(cx * csize, cz * csize, csize, csize)
+            pen = QtGui.QPen()
+            pen.setStyle(QtCore.Qt.NoPen)
+            sq.setPen(pen)
+            sq.setBrush(QtGui.QColor(255, 255, 255, 128))
+            self.scene.addItem(sq)
+            self.paint = 1
+            
+        self.selectlabel.setText('Chunks selected: {0}'.format(len(self.selected) if self.selected else ''))
+        
         
         
 class MBMapRegion(QtGui.QGraphicsPixmapItem):
@@ -109,9 +138,27 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
     def hoverMoveEvent(self, event):
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
+        
         self.win.update_labels(x, z)
         
+    
+    def mouseMoveEvent(self, event):
+        pos = event.scenePos()
+        x, z = int(pos.x()), int(pos.y())
+
+        if self.win.paint is not None:
+            self.win.toggle_select((x, z))
         
+        
+    def mousePressEvent(self, event):
+        pos = event.scenePos()
+        x, z = int(pos.x()), int(pos.y())
+        self.win.toggle_select((x, z))
+        
+    
+    def mouseReleaseEvent(self, event):
+        self.win.paint = None
+
 
         
 # startup

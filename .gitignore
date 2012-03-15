@@ -1,0 +1,6 @@
+*.pyc
+minebash/old/*
+.project
+.pydevproject
+.settings
+cache/*

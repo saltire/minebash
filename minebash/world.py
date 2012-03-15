@@ -46,6 +46,11 @@ class World:
     def get_regions(self, limits=None):
         """Returns a dict of all existing regions (within optional chunk limits), indexed by coordinates."""
         return dict(((rx, rz), self.regions[rx, rz]) for (rx, rz) in self.get_region_list(limits))
+    
+    
+    def get_region(self, (rx, rz)):
+        """Returns a region at a specific coordinate, if it exists."""
+        return self.regions[rx, rz] if (rx, rz) in self.regions else None
 
 
     def _read_region_list(self, force_region=0):
@@ -87,6 +92,23 @@ class Region:
     def get_chunk_list(self, list=None):
         """Returns a list of coordinates of chunks existing in the region file."""
         return self.chunkinfo.keys()
+    
+    
+    def read_chunks(self, bcrop=None):
+        """Returns a dict of all chunks in the region (within an optional crop),
+        indexed by local chunk coordinates."""
+        chunklist = [(cx, cz) for (cx, cz) in self._crop_coords(self.chunkinfo.keys(), bcrop, self.csize)]
+        if not chunklist:
+            return []
+        with open(self.path, 'rb') as rfile:
+            return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in chunklist)
+        
+        
+    def _crop_coords(self, coords, crop, scale=1):
+        """Given a list of coordinates, returns those within a given bounding box.
+        Crop coordinates are at block scale, divided by scale parameter."""
+        w, e, n, s = (i / scale for i in crop)
+        return [(x, z) for (x, z) in coords if w <= x <= e and n <= z <= s] if crop else coords
     
     
     def read_chunks(self, whitelist=None):
@@ -133,7 +155,7 @@ class Region:
                     sectornum = offset / 256 # first sector of chunk (3 bytes)
                     sectorlength = offset % 256 # chunk's length in sectors (1 byte)
                     if sectornum > 0 and sectorlength > 0:
-                        chunkinfo[rx * self.rsize + cx, rz * self.rsize + cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
+                        chunkinfo[cx, cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
         return chunkinfo
 
 
@@ -245,6 +267,8 @@ class AnvilChunk(Chunk):
                     start = self.csize * z + x
                     # get a Y column from data stored in YZX order
                     blocks[x, z, sya:syb] = section[start:start + self.secheight * self.csize * self.csize:self.csize * self.csize]
+        
+        # also have to implement the extra data layer in the anvil format
         
         return blocks
 
