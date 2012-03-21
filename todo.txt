@@ -1,0 +1,13 @@
+
+program:
+- add exceptions when invalid world folders are passed
+
+render and cache:
+- cache worlds by path rather than by name, possibly inside the world folder
+- cache a timestamp and only update chunks that have a more recent mtime
+
+copy and paste:
+- copy and paste chunks from one world to another
+- drag a pasted selection around
+- save a world with pasted chunks substituted in
+

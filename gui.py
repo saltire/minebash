@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 
@@ -10,7 +11,7 @@ from minebash import world
 
 
 class MineBash(QtGui.QMainWindow):
-    def __init__(self, colours, wld):
+    def __init__(self, colours, wpath=None):
         QtGui.QMainWindow.__init__(self)
         
         self.colours = colours
@@ -18,9 +19,10 @@ class MineBash(QtGui.QMainWindow):
         self.init_ui()
         self.show()
         
-        # temp
-        tab = MBWorldTab(self, wld)
-        self.tabs.addTab(tab, wld.name)
+        if wpath:
+            startworld = world.World(wpath)
+            tab = MBWorldTab(self, startworld)
+            self.tabs.addTab(tab, startworld.name)
         
         
     def init_ui(self):
@@ -201,13 +203,20 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
         
 # startup
 
-wpath = 'd:\\games\\Minecraft\\server\\loreland'
-colours = 'colours.csv'
+if __name__ == '__main__':
+    argp = argparse.ArgumentParser('Mine Bash - a Minecraft map editor.')
+    argp.add_argument('--world', '-w')
+    argp.add_argument('--colours', '-c')
+    
+    args = argp.parse_args()
+    
+    wpath = args.world or 'd:\\games\\Minecraft\\server\\loreland' # temp default
+    colours = args.colours or 'colours.csv'
+    
+    app = QtGui.QApplication()
 
-app = QtGui.QApplication(sys.argv)
+    minebash = MineBash(colours, wpath)
 
-minebash = MineBash(colours, world.World(wpath))
-
-sys.exit(app.exec_())
+    sys.exit(app.exec_())
 
 
