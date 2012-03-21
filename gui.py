@@ -41,6 +41,7 @@ class MineBash(QtGui.QMainWindow):
         if os.path.exists(os.path.join(dir, 'level.dat')):
             tab = MBWorldTab(self, world.World(dir))
             self.tabs.addTab(tab, tab.world.name)
+            self.tabs.setCurrentWidget(tab)
             
         else:
             print 'Not a world dir!'
@@ -68,6 +69,7 @@ class MBWorldTab(QtGui.QWidget):
         mainlayout.setSpacing(10)
 
         self.scene = QtGui.QGraphicsScene(self)
+        self.scene.setBackgroundBrush(QtGui.QColor(25, 25, 25))
         view = QtGui.QGraphicsView(self.scene, self)
         frame = QtGui.QFrame(self)
         
@@ -124,10 +126,9 @@ class MBWorldTab(QtGui.QWidget):
         print 'done.'
         
         
-    def toggle_select(self, (x, z)):
+    def toggle_select(self, (cx, cz)):
         csize = self.world.csize
-        cx, cz = x / csize, z / csize
-
+        
         if (cx, cz) in self.selected and self.paint != 1:
             self.scene.removeItem(self.scene.itemAt(cx * csize, cz * csize))
             self.selected.remove((cx, cz))
@@ -166,8 +167,6 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
 
         self.setAcceptHoverEvents(1)
         self.tab = tab
-        self.csize = 16
-        self.rsize = 32
         
         
     def hoverLeaveEvent(self, event):
@@ -177,22 +176,22 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
     def hoverMoveEvent(self, event):
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
-        
         self.tab.update_labels(x, z)
         
     
     def mouseMoveEvent(self, event):
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
-
-        if self.tab.paint is not None:
-            self.tab.toggle_select((x, z))
+        cx, cz = x / self.tab.world.csize, z / self.tab.world.csize
+        if (cx, cz) in self.tab.world.chunklist and self.tab.paint is not None:
+            self.tab.toggle_select((cx, cz))
         
         
     def mousePressEvent(self, event):
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
-        self.tab.toggle_select((x, z))
+        cx, cz = x / self.tab.world.csize, z / self.tab.world.csize
+        self.tab.toggle_select((cx, cz))
         
     
     def mouseReleaseEvent(self, event):
@@ -202,7 +201,7 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
         
 # startup
 
-wpath = 'd:\\games\\Minecraft\\server\\asgard'
+wpath = 'd:\\games\\Minecraft\\server\\loreland'
 colours = 'colours.csv'
 
 app = QtGui.QApplication(sys.argv)

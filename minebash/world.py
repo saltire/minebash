@@ -18,11 +18,11 @@ class World:
         self.regionlist = self._read_region_list(force_region)
 
         self.regions = {}
+        self.chunklist = set()
         for rx, rz in self.get_region_list():
             self.regions[rx, rz] = (AnvilRegion if self.anvil else Region)(self.path, (rx, rz))
-        self.chunklist = []
-        for region in self.regions.values():
-            self.chunklist.extend(region.get_chunk_list())
+            for cx, cz in self.regions[rx, rz].get_chunk_list():
+                self.chunklist.add((rx * self.rsize + cx, rz * self.rsize + cz))
             
             
     def get_chunk_list(self, limits=None):
@@ -55,7 +55,8 @@ class World:
 
 
     def _read_region_list(self, force_region=0):
-        """Returns a list of coordinates of all regions in the world directory."""
+        """Returns a list of coordinates of all regions in the world directory.
+        Setting force_region to true forces it to look for the old region format."""
         anvillist = []
         regionlist = []
         regionpath = os.path.join(self.path, 'region')
