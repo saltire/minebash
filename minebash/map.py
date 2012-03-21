@@ -23,7 +23,7 @@ class Map:
     def draw_region(self, (rx, rz)):
         """Draw a single region; that is, the data from a single region file."""
         region = self.world.get_region((rx, rz))
-        return self._generate_region(region)
+        return self._generate_region_map(region)
         
         #rbsize = self.csize * self.rsize
         #crop = rx * rbsize, (rx + 1) * rbsize - 1, rz * rbsize, (rz + 1) * rbsize - 1

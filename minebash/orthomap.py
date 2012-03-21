@@ -51,7 +51,7 @@ class OrthoMap(map.Map):
                     for y in reversed(range(self.height)):
                         if blocks[x, z, y]:
                             colour = self._get_block_colour(blocks[x, z, :], y)
-                            pixels[x, y] = colour
+                            pixels[bx, bz] = colour
                             break
         return image
     
@@ -69,7 +69,7 @@ class OrthoMap(map.Map):
             for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                 bx, bz = (cx * self.csize + x, cz * self.csize + z)
                 if w <= bx <= e and n <= bz <= s:
-                    pixels[x, y] = [hmap[x, y]] * 3
+                    pixels[bx, bz] = [hmap[x, z]] * 3
         return image
                     
         

@@ -13,6 +13,7 @@ class World:
         self.csize = 16
         
         self.path = path
+        self.name = os.path.basename(path)
         self.anvil = 0
         self.regionlist = self._read_region_list(force_region)
 
@@ -58,7 +59,10 @@ class World:
         anvillist = []
         regionlist = []
         regionpath = os.path.join(self.path, 'region')
-        if os.path.isdir(regionpath):
+        if not os.path.isdir(regionpath):
+            print "Dir doesn't exist!"
+            
+        else:
             for filename in os.listdir(regionpath):
                 r, rx, rz, ext = filename.split('.')
                 if r == 'r' and ext == 'mca':
@@ -221,12 +225,14 @@ class Chunk:
     
     def get_blocks(self):
         bdata = self.find_tag('Blocks')
-        blocks = [] # list of rows, columns, blocks, [x][z][y]
+        #blocks = [] # list of rows, columns, blocks, [x][z][y]
+        blocks = numpy.zeros((self.csize, self.csize, self.cheight), numpy.int16) # x, z, y
         for x in range(self.csize):
-            blocks.append([])
+            #blocks.append([])
             for z in range(self.csize):
                 colstart = x * self.cheight * self.csize + z * self.cheight
-                blocks[x].append(bdata[colstart:colstart + self.cheight])
+                #blocks[x].append(bdata[colstart:colstart + self.cheight])
+                blocks[x, z, :] = bdata[colstart:colstart + self.cheight]
         return blocks
 
 
@@ -254,7 +260,7 @@ class AnvilChunk(Chunk):
         
         
     def get_blocks(self):
-        blocks = numpy.zeros((16, 16, 256), numpy.int16) # x, z, y
+        blocks = numpy.zeros((self.csize, self.csize, self.secheight * self.sections), numpy.int16) # x, z, y
         sections = {}
         for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
             sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
