@@ -218,21 +218,18 @@ class Chunk:
     
     def get_heightmap(self):
         hmapdata = self.find_tag('HeightMap')
-        hmap = [] # list of rows, columns,[x][z]
+        hmap = numpy.zeros((self.csize, self.csize), numpy.ubyte) # x, z
         for z in range(self.csize):
-            hmap.append(hmapdata[z * self.csize:(z + 1) * self.csize])
-        return zip(*hmap) # the asterisk unpacks the list into arguments for the zip function
+            hmap[:, z] = hmapdata[z * self.csize:(z + 1) * self.csize]
+        return hmap
     
     
     def get_blocks(self):
         bdata = self.find_tag('Blocks')
-        #blocks = [] # list of rows, columns, blocks, [x][z][y]
-        blocks = numpy.zeros((self.csize, self.csize, self.cheight), numpy.int16) # x, z, y
+        blocks = numpy.zeros((self.csize, self.csize, self.cheight), numpy.uint16) # x, z, y
         for x in range(self.csize):
-            #blocks.append([])
             for z in range(self.csize):
                 colstart = x * self.cheight * self.csize + z * self.cheight
-                #blocks[x].append(bdata[colstart:colstart + self.cheight])
                 blocks[x, z, :] = bdata[colstart:colstart + self.cheight]
         return blocks
 
@@ -261,7 +258,7 @@ class AnvilChunk(Chunk):
         
         
     def get_blocks(self):
-        blocks = numpy.zeros((self.csize, self.csize, self.secheight * self.sections), numpy.int16) # x, z, y
+        blocks = numpy.zeros((self.csize, self.csize, self.secheight * self.sections), numpy.uint16) # x, z, y
         sections = {}
         for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
             sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
@@ -278,24 +275,12 @@ class AnvilChunk(Chunk):
         # also have to implement the extra data layer in the anvil format
         
         return blocks
-
     
-    def get_blocks_old(self):
-        blocks = [] # list of rows, columns, blocks, [x][z][y]
-        sections = {}
-        for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
-            sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
-        
-        for x in range(self.csize):
-            blocks.append([])
-            for z in range(self.csize):
-                blocks[x].append([])
-                for s in range(self.sections):
-                    if s not in sections:
-                        blocks[x][z].extend([0] * self.secheight)
-                    else:
-                        for sy in range(self.secheight):
-                            blocks[x][z].append(sections[s][sy * self.csize * self.csize + z * self.csize + x])
-        
-        return blocks
+    
+    def get_biomes(self):
+        bidata = self.find_tag('Biomes')
+        biomes = numpy.zeros((self.csize, self.csize), numpy.ubyte) # x, z
+        for z in range(self.csize):
+            biomes[:, z] = bidata[z * self.csize:(z + 1) * self.csize]
+        return biomes
 

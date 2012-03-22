@@ -11,10 +11,11 @@ from minebash import world
 
 
 class MineBash(QtGui.QMainWindow):
-    def __init__(self, colours, wpath=None):
+    def __init__(self, wpath=None, colours=None, biomes=None):
         QtGui.QMainWindow.__init__(self)
         
         self.colours = colours
+        self.biomes = biomes
         
         self.init_ui()
         self.show()
@@ -56,6 +57,7 @@ class MBWorldTab(QtGui.QWidget):
         
         self.win = win
         self.world = wld
+        self.map = orthomap.OrthoMap(self.world, self.win.colours, self.win.biomes)
         
         self.selected = set()
         self.paint = None
@@ -89,34 +91,31 @@ class MBWorldTab(QtGui.QWidget):
             framelayout.addWidget(self.labels[label])
             
         self.selectlabel = QtGui.QLabel('Chunks selected:')
+        self.selectlabel.setMinimumSize(100, 40)
         framelayout.addWidget(self.selectlabel)
         
         framelayout.addStretch()
+        
+        self.biomecheck = QtGui.QCheckBox('Show biomes')
+        self.biomecheck.setMinimumSize(80, 40)
+        self.biomecheck.stateChanged.connect(lambda: self.draw_map())
+        framelayout.addWidget(self.biomecheck)
 
         generate = QtGui.QPushButton('Generate', self)
-        generate.clicked.connect(lambda: self.draw_map(1))
+        generate.clicked.connect(lambda: self.draw_map(refresh=1))
         framelayout.addWidget(generate)
         
         
-    def draw_map(self, refresh=0):
-        cachepath = os.path.join(os.getcwd(), 'cache', self.world.name)
-        if not os.path.exists(cachepath):
-            os.makedirs(cachepath)
-            
+    def draw_map(self, refresh=False):
         regions = self.world.get_region_list()
         for rnum, (rx, rz) in enumerate(regions):
-            
-            path = os.path.join(cachepath, '{0}.{1}.png'.format(rx, rz))
-            print 'trying region {0}/{1} at {2}...'.format(rnum + 1, len(regions), path),
-            if os.path.exists(path) and not refresh:
-                img = Image.open(path)
-                print 'found.'
-            else:
-                print 'nope.'
-                img = orthomap.OrthoMap(self.world, self.win.colours).draw_region((rx, rz))
-                img.save(path)
-                print 'cached', path
+            print 'trying region {0}/{1}...'.format(rnum + 1, len(regions))
+            img = self.get_region_image((rx, rz), refresh=refresh)
                 
+            if self.biomecheck.isChecked():
+                bimg = self.get_region_image((rx, rz), type='biome', refresh=refresh)
+                img = Image.blend(img, bimg, 0.5)
+            
             w, h = img.size
             data = img.tostring('raw', 'BGRA')
             
@@ -126,6 +125,26 @@ class MBWorldTab(QtGui.QWidget):
             self.scene.addItem(pixitem)
             
         print 'done.'
+        
+        
+    def get_region_image(self, (rx, rz), type='block', refresh=False):
+        if type not in ('block', 'biome', 'heightmap'):
+            type = 'block'
+            
+        cachepath = os.path.join(os.getcwd(), 'cache', self.world.name)
+        if not os.path.exists(cachepath):
+            os.makedirs(cachepath)
+            
+        path = os.path.join(cachepath, '{0}_{1}.{2}.png'.format(type, rx, rz))
+        if os.path.exists(path) and not refresh:
+            img = Image.open(path)
+            print 'found', path
+        else:
+            img = self.map.draw_region((rx, rz), type=type)
+            img.save(path)
+            print 'cached', path
+            
+        return img
         
         
     def toggle_select(self, (cx, cz)):
@@ -207,15 +226,15 @@ if __name__ == '__main__':
     argp = argparse.ArgumentParser('Mine Bash - a Minecraft map editor.')
     argp.add_argument('--world', '-w')
     argp.add_argument('--colours', '-c')
+    argp.add_argument('--biomes', '-b')
     
     args = argp.parse_args()
     
     wpath = args.world or 'd:\\games\\Minecraft\\server\\loreland' # temp default
-    colours = args.colours or 'colours.csv'
     
-    app = QtGui.QApplication()
+    app = QtGui.QApplication(sys.argv)
 
-    minebash = MineBash(colours, wpath)
+    minebash = MineBash(wpath, args.colours, args.biomes)
 
     sys.exit(app.exec_())
 

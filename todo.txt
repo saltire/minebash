@@ -2,7 +2,7 @@
 program:
 - add exceptions when invalid world folders are passed
 
-render and cache:
+cache:
 - cache worlds by path rather than by name, possibly inside the world folder
 - cache a timestamp and only update chunks that have a more recent mtime
 
@@ -11,3 +11,13 @@ copy and paste:
 - drag a pasted selection around
 - save a world with pasted chunks substituted in
 
+rendering:
+- rotation on orthographic map
+- allow oblique map to crop right to blocks, not to chunks
+- add side colours to block colour list
+- lighting, night mode
+- nether
+
+other features:
+- server manager
+- mod manager

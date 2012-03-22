@@ -63,15 +63,31 @@ class OrthoMap(map.Map):
         w, e, n, s = bcrop if bcrop else (0, size - 1, 0, size - 1)
         
         chunks = region.read_chunks(bcrop)
-        print 'drawing blocks in', len(chunks), 'chunks...'
+        print 'drawing heightmap for', len(chunks), 'chunks...'
         for (cx, cz), chunk in chunks.iteritems():
             hmap = chunk.get_heightmap()
             for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                 bx, bz = (cx * self.csize + x, cz * self.csize + z)
                 if w <= bx <= e and n <= bz <= s:
-                    pixels[bx, bz] = [hmap[x, z]] * 3
+                    pixels[bx, bz] = (hmap[x, z], hmap[x, z], hmap[x, z])
         return image
-                    
+    
+    
+    def _generate_region_biomes(self, region, bcrop=None):
+        size = self.rsize * self.csize
+        image = Image.new('RGBA', (size, size))
+        pixels = image.load()
+        w, e, n, s = bcrop if bcrop else (0, size - 1, 0, size - 1)
+        
+        chunks = region.read_chunks(bcrop)
+        print 'drawing biomes for', len(chunks), 'chunks...'
+        for (cx, cz), chunk in chunks.iteritems():
+            biomes = chunk.get_biomes()
+            for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
+                bx, bz = (cx * self.csize + x, cz * self.csize + z)
+                if w <= bx <= e and n <= bz <= s:
+                    pixels[bx, bz] = self.biomes[biomes[x, z]]
+        return image
         
         
     def _get_block_colour(self, column, y):

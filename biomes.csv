@@ -1,0 +1,24 @@
+# id     r     g     b  name
+   0,    0,   42,  243, Ocean
+   1,  151,  190,   78, Plains
+   2,  134,  124,   77, Desert
+   3,  149,  185,  114, Extreme Hills
+   4,   50,  128,   49, Forest
+   5,  152,  189,  141, Taiga
+   6,  110,  125,  104, Swampland
+   7,    0,  120,  223, River
+   8,  117,   48,   48, Hell
+   9,  116,  180,  254, Sky
+  10,  150,  158,  248, FrozenOcean
+  11,  140,  183,  223, FrozenRiver
+  12,  202,  208,  255, Ice Plains
+  13,  226,  229,  255, Ice Mountains
+  14,  182,   37,   36, Mushroom Island
+  15,  220,   96,   96, Mushroom Island Shore
+  16,  232,  212,  132, Beach
+  17,  197,  180,  112, Desert Hills
+  18,   69,  173,   67, Forest Hills
+  19,  184,  230,  171, Taiga Hills
+  20,  171,  185,   91, Extreme Hills Edge
+  21,    0,  204,    0, Jungle
+  22,    0,  255,    0, Jungle Hills

@@ -3,14 +3,15 @@ from PIL import Image
 import world
 
 class Map:
-    def __init__(self, world, colours):
+    def __init__(self, world, colours=None, biomes=None):
         self.rsize = 32
         self.csize = 16
         self.height = 128
         self.rotate = 0
         
         self.world = world
-        self.colours = self._load_colours(colours)
+        self.colours = self._load_colours(colours or 'colours.csv')
+        self.biomes = self._load_colours(biomes or 'biomes.csv')
         
         
     def draw_map(self, imgpath, limits=None):
@@ -20,14 +21,19 @@ class Map:
         print 'saved image to', imgpath
         
     
-    def draw_region(self, (rx, rz)):
+    def draw_region(self, (rx, rz), bcrop=None, type='block'):
         """Draw a single region; that is, the data from a single region file."""
         region = self.world.get_region((rx, rz))
-        return self._generate_region_map(region)
         
-        #rbsize = self.csize * self.rsize
-        #crop = rx * rbsize, (rx + 1) * rbsize - 1, rz * rbsize, (rz + 1) * rbsize - 1
-        #return self._generate_map_data(crop)
+        if type not in ('block', 'heightmap', 'biome'):
+            type = 'block'
+        
+        if type == 'heightmap':
+            return self._generate_region_heightmap(region, bcrop)
+        elif type == 'biome':
+            return self._generate_region_biomes(region, bcrop)
+        else:
+            return self._generate_region_map(region, bcrop)
     
     
     def draw_region_at_point(self, (x, z)):
@@ -76,9 +82,10 @@ class Map:
         colours = {}
         with open(path, 'rb') as cfile:
             for line in cfile.readlines():
-                if line.strip() and line[:1] != '#':
-                    id, r, g, b, a, n, name =line.split(',')
-                    colours[int(id)] = (int(r), int(g), int(b), int(a), int(n), name.strip())
+                if line.strip() and line[0] != '#':
+                    values = line.split(',')
+                    id = int(values[0])
+                    colours[id] = tuple(int(x) for x in values[1:-1])
         return colours
 
     
