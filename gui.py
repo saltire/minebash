@@ -148,15 +148,13 @@ class MBWorldTab(QtGui.QWidget):
         
         
     def toggle_select(self, (cx, cz)):
-        csize = self.world.csize
-        
         if (cx, cz) in self.selected and self.paint != 1:
-            self.scene.removeItem(self.scene.itemAt(cx * csize, cz * csize))
+            self.scene.removeItem(self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE))
             self.selected.remove((cx, cz))
             self.paint = 0
             
         elif (cx, cz) not in self.selected and self.paint != 0:
-            sq = QtGui.QGraphicsRectItem(cx * csize, cz * csize, csize, csize)
+            sq = QtGui.QGraphicsRectItem(cx * world.CSIZE, cz * world.CSIZE, world.CSIZE, world.CSIZE)
             pen = QtGui.QPen()
             pen.setStyle(QtCore.Qt.NoPen)
             sq.setPen(pen)
@@ -174,8 +172,8 @@ class MBWorldTab(QtGui.QWidget):
         
         
     def update_labels(self, x, z):
-        cx, cz = x / self.world.csize, z / self.world.csize
-        rx, rz = cx / self.world.rsize, cz / self.world.rsize
+        cx, cz = x / world.CSIZE, z / world.CSIZE
+        rx, rz = cx / world.CSIZE, cz / world.CSIZE
         self.labels['Block'].setText('Block: {0}, {1}'.format(x, z))
         self.labels['Chunk'].setText('Chunk: {0}, {1}'.format(cx, cz))
         self.labels['Region'].setText('Region: {0}, {1}'.format(rx, rz))
@@ -203,7 +201,7 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
     def mouseMoveEvent(self, event):
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
-        cx, cz = x / self.tab.world.csize, z / self.tab.world.csize
+        cx, cz = x / world.CSIZE, z / world.CSIZE
         if (cx, cz) in self.tab.world.chunklist and self.tab.paint is not None:
             self.tab.toggle_select((cx, cz))
         
@@ -211,7 +209,7 @@ class MBMapRegion(QtGui.QGraphicsPixmapItem):
     def mousePressEvent(self, event):
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
-        cx, cz = x / self.tab.world.csize, z / self.tab.world.csize
+        cx, cz = x / world.CSIZE, z / world.CSIZE
         self.tab.toggle_select((cx, cz))
         
     

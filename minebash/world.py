@@ -7,11 +7,25 @@ import numpy
 import nbt
 
 
+RSIZE = 32
+CSIZE = 16
+SECTIONS = 16
+SECHEIGHT = 16
+CHEIGHT = 128
+
+
+def crop_coords(self, coords, bcrop=None, scale=1):
+    """Filter a list of coordinates by a bounding box.
+    Coordinates are at block scope, divided by scale if specified."""
+    if bcrop is None:
+        return coords
+    w, e, n, s = (i / scale for i in bcrop)
+    return [(x, z) for (x, z) in coords if w <= x <= e and n <= z <= s]
+
+
+
 class World:
     def __init__(self, path, force_region=0):
-        self.rsize = 32
-        self.csize = 16
-        
         self.path = path
         self.name = os.path.basename(path)
         self.anvil = 0
@@ -22,31 +36,42 @@ class World:
         for rx, rz in self.get_region_list():
             self.regions[rx, rz] = (AnvilRegion if self.anvil else Region)(self.path, (rx, rz))
             for cx, cz in self.regions[rx, rz].get_chunk_list():
-                self.chunklist.add((rx * self.rsize + cx, rz * self.rsize + cz))
+                self.chunklist.add((rx * RSIZE + cx, rz * RSIZE + cz))
             
             
-    def get_chunk_list(self, limits=None):
-        """Returns a list of coordinates of all existing chunks (within optional chunk limits)."""
-        return self._get_coords_in_limits(self.chunklist, limits, self.csize)
-            
-            
-    def get_chunks(self, limits=None):
-        """Returns a dict of all existing chunks (within optional chunk limits), indexed by coordinates."""
+    def get_chunk_list(self, whitelist=None):
+        """Returns a list of coordinates of all existing chunks (within optional whitelist)."""
+        if whitelist is None:
+            return self.chunklist
+        else:
+            return [(cx, cz) for (cx, cz) in self.chunklist if (cx, cz) in whitelist]
+    
+    
+    def get_chunks(self, whitelist=None):
+        """Returns a dict of all existing chunks (within optional chunk whitelist), indexed by coordinates."""
         chunks = {}
-        for region in self.get_regions(limits, self.rsize).values():
-            chunklist = self._get_coords_in_limits(region.get_chunk_list(), self.csize)
-            chunks.update(region.read_chunks(chunklist))
+        for region in self.regions.values():
+            chunks.update(region.read_chunks(whitelist))
         return chunks
     
     
-    def get_region_list(self, limits=None):
-        """Returns a list of coordinates of all existing regions (within optional chunk limits)."""
-        return self._get_coords_in_limits(self.regionlist, limits, self.rsize * self.csize)
+    def get_chunk(self, (cx, cz)):
+        """Get a single chunk, from the appropriate region."""
+        return self.regions[rx, rz].read_chunks([(cx, cz)])
+    
+    
+    def get_region_list(self, whitelist=None):
+        """Returns a list of coordinates of all existing regions (within optional chunk whitelist)."""
+        if whitelist is None:
+            return self.regionlist
+        else:
+            region_whitelist = ((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist)
+            return [(rx, rz) for (rx, rz) in self.regionlist if (rx, rz) in region_whitelist]
         
         
-    def get_regions(self, limits=None):
-        """Returns a dict of all existing regions (within optional chunk limits), indexed by coordinates."""
-        return dict(((rx, rz), self.regions[rx, rz]) for (rx, rz) in self.get_region_list(limits))
+    def get_regions(self, whitelist=None):
+        """Returns a dict of all existing regions (within optional chunk whitelist), indexed by coordinates."""
+        return {(rx, rz): self.regions[rx, rz] for (rx, rz) in self.get_region_list(whitelist)}
     
     
     def get_region(self, (rx, rz)):
@@ -75,73 +100,36 @@ class World:
         return anvillist if anvillist and not force_region else regionlist
     
     
-    def _get_coords_in_limits(self, coords, limits=None, scale=1):
-        """Filter a list of coordinates by a bounding box.
-        Coordinates are at chunk scope, divided by scale if specified."""
-        if limits is None:
-            return coords
-        w, e, n, s = [i / scale for i in limits]
-        return [(x, z) for (x, z) in coords if w <= x <= e and n <= z <= s]
-    
-    
     
 class Region:
     def __init__(self, worldpath, (rx, rz), anvil=0):
         self.path = os.path.join(worldpath, 'region', 'r.{0}.{1}.mcr'.format(rx, rz))
-        self.rsize = 32
-        self.csize = 16
-        self.coords = (rx, rz)
+        self.coords = rx, rz
         self.chunkinfo = self._read_chunk_info()
         
         
-    def get_chunk_list(self, list=None):
-        """Returns a list of coordinates of chunks existing in the region file."""
-        return self.chunkinfo.keys()
-    
-    
-    def read_chunks(self, bcrop=None):
-        """Returns a dict of all chunks in the region (within an optional crop),
-        indexed by local chunk coordinates."""
-        chunklist = [(cx, cz) for (cx, cz) in self._crop_coords(self.chunkinfo.keys(), bcrop, self.csize)]
-        if not chunklist:
-            return []
-        with open(self.path, 'rb') as rfile:
-            return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in chunklist)
-        
-        
-    def _crop_coords(self, coords, crop, scale=1):
-        """Given a list of coordinates, returns those within a given bounding box.
-        Crop coordinates are at block scale, divided by scale parameter."""
-        w, e, n, s = (i / scale for i in crop)
-        return [(x, z) for (x, z) in coords if w <= x <= e and n <= z <= s] if crop else coords
+    def get_chunk_list(self, whitelist=None):
+        """Returns a list of LOCAL chunk coordinates existing in the region file,
+        within an optional whitelist of GLOBAL chunk coordinates."""
+        if whitelist is None:
+            return self.chunkinfo.keys()
+        else:
+            rx, rz = self.coords
+            return [(cx, cz) for (cx, cz) in self.chunkinfo.keys()
+                    if (rx * RSIZE + cx, rz * RSIZE + cz) in whitelist]
     
     
     def read_chunks(self, whitelist=None):
-        """Returns a dict of all existing chunks (within an optional whitelist), indexed by coordinates."""
+        """Returns a dict of all chunks in the region (within an optional chunk whitelist),
+        indexed by local chunk coordinates."""
+        chunklist = self.get_chunk_list(whitelist)
+        if not chunklist:
+            return []
+        
         with open(self.path, 'rb') as rfile:
-            return dict(((cx, cz), self._read_chunk((cx, cz), rfile)) for (cx, cz) in self.chunkinfo.iterkeys() if whitelist is None or (cx, cz) in whitelist)
+            return {(cx, cz): self._read_chunk((cx, cz), rfile) for (cx, cz) in chunklist}
         
         
-    # experimental function to see if it would improve speed, but didn't really
-    def read_all_chunks(self, whitelist=None):
-        """Returns a dict of all existing chunks (within an optional whitelist), indexed by coordinates.
-        This method loads all chunks in a single read, rather than seeking to each one individually."""
-        with open(self.path, 'rb') as rfile:
-            rfile.seek(8192)
-            cdata = rfile.read()
-        
-        chunks = {}
-        for (cx, cz), cinfo in self.chunkinfo.iteritems():
-            cstart = (cinfo['sectornum'] - 2) * 4096
-            cend = (cinfo['sectornum'] - 2 + cinfo['sectorlength']) * 4096
-            chunk = cdata[cstart:cend]
-            length, version = struct.unpack('>ib', chunk[:5])
-            if version == 2:
-                chunks[cx, cz] = Chunk(zlib.decompress(chunk[5:length + 4]))
-                
-        return dict(((cx, cz), chunks[cx, cz]) for (cx, cz) in chunks.iterkeys() if whitelist is None or (cx, cz) in whitelist)
-    
-    
     def _read_chunk_info(self):
         """Returns a dict of chunks that exist in the region file, indexed by coords,
         and containing the modification time and sector offset."""
@@ -150,9 +138,9 @@ class Region:
         with open(self.path, 'rb') as rfile:
             offsets = struct.unpack_from('>1024i', rfile.read(4096))
             mtimes = struct.unpack_from('>1024i', rfile.read(4096))
-            for cz in range(self.rsize):
-                for cx in range(self.rsize):
-                    index = cx + cz * self.rsize
+            for cz in range(RSIZE):
+                for cx in range(RSIZE):
+                    index = cx + cz * RSIZE
                     offset = offsets[index]
                     mtime = mtimes[index]
                     #print '({0}, {1}): Read header {2} at {3}'.format(
@@ -182,9 +170,7 @@ class Region:
 class AnvilRegion(Region):
     def __init__(self, worldpath, (rx, rz)):
         self.path = os.path.join(worldpath, 'region', 'r.{0}.{1}.mca'.format(rx, rz))
-        self.rsize = 32
-        self.csize = 16
-        self.coords = (rx, rz)
+        self.coords = rx, rz
         self.chunkinfo = self._read_chunk_info()
 
 
@@ -205,7 +191,6 @@ class AnvilRegion(Region):
     
 class Chunk:
     def __init__(self, data):
-        self.csize = 16
         self.cheight = 128
         self.tags = nbt.NBT(data).tags[0][2][0][2]
 
@@ -218,18 +203,18 @@ class Chunk:
     
     def get_heightmap(self):
         hmapdata = self.find_tag('HeightMap')
-        hmap = numpy.zeros((self.csize, self.csize), numpy.ubyte) # x, z
-        for z in range(self.csize):
-            hmap[:, z] = hmapdata[z * self.csize:(z + 1) * self.csize]
+        hmap = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
+        for z in range(CSIZE):
+            hmap[:, z] = hmapdata[z * CSIZE:(z + 1) * CSIZE]
         return hmap
     
     
     def get_blocks(self):
         bdata = self.find_tag('Blocks')
-        blocks = numpy.zeros((self.csize, self.csize, self.cheight), numpy.uint16) # x, z, y
-        for x in range(self.csize):
-            for z in range(self.csize):
-                colstart = x * self.cheight * self.csize + z * self.cheight
+        blocks = numpy.zeros((CSIZE, CSIZE, self.cheight), numpy.uint16) # x, z, y
+        for x in range(CSIZE):
+            for z in range(CSIZE):
+                colstart = x * self.cheight * CSIZE + z * self.cheight
                 blocks[x, z, :] = bdata[colstart:colstart + self.cheight]
         return blocks
 
@@ -237,12 +222,12 @@ class Chunk:
     def get_block_data(self):
         ddata = self.find_tag('Data')
         data = []
-        for x in range(self.csize):
+        for x in range(CSIZE):
             data.append([])
-            for z in range(self.csize):
+            for z in range(CSIZE):
                 data[x].append([])
                 for y in range(self.cheight):
-                    byte = ddata[x * self.cheight * self.csize + z * self.cheight + y]
+                    byte = ddata[x * self.cheight * CSIZE + z * self.cheight + y]
                     # block data is stored as 4 bits per block, so we have to break each byte in half
                     data[x][z].append(byte % 16 if y % 2 else byte / 16)
         return data
@@ -251,26 +236,23 @@ class Chunk:
 
 class AnvilChunk(Chunk):
     def __init__(self, data):
-        self.csize = 16
-        self.sections = 16
-        self.secheight = 16
         self.tags = nbt.NBT(data).tags[0][2][0][2]
         
         
     def get_blocks(self):
-        blocks = numpy.zeros((self.csize, self.csize, self.secheight * self.sections), numpy.uint16) # x, z, y
+        blocks = numpy.zeros((CSIZE, CSIZE, SECHEIGHT * SECTIONS), numpy.uint16) # x, z, y
         sections = {}
         for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
             sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
         
-        for x in range(self.csize):
-            for z in range(self.csize):
+        for x in range(CSIZE):
+            for z in range(CSIZE):
                 for s, section in sections.items():
-                    sya = s * self.secheight
-                    syb = sya + self.secheight
-                    start = self.csize * z + x
+                    sya = s * SECHEIGHT
+                    syb = sya + SECHEIGHT
+                    start = CSIZE * z + x
                     # get a Y column from data stored in YZX order
-                    blocks[x, z, sya:syb] = section[start:start + self.secheight * self.csize * self.csize:self.csize * self.csize]
+                    blocks[x, z, sya:syb] = section[start:start + SECHEIGHT * CSIZE * CSIZE:CSIZE * CSIZE]
         
         # also have to implement the extra data layer in the anvil format
         
@@ -279,8 +261,8 @@ class AnvilChunk(Chunk):
     
     def get_biomes(self):
         bidata = self.find_tag('Biomes')
-        biomes = numpy.zeros((self.csize, self.csize), numpy.ubyte) # x, z
-        for z in range(self.csize):
-            biomes[:, z] = bidata[z * self.csize:(z + 1) * self.csize]
+        biomes = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
+        for z in range(CSIZE):
+            biomes[:, z] = bidata[z * CSIZE:(z + 1) * CSIZE]
         return biomes
 

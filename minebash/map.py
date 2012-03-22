@@ -3,13 +3,13 @@ from PIL import Image
 import world
 
 class Map:
-    def __init__(self, world, colours=None, biomes=None):
-        self.rsize = 32
-        self.csize = 16
-        self.height = 128
+    def __init__(self, wld, colours=None, biomes=None):
+        self.csize = world.CSIZE
+        self.rsize = world.RSIZE
+        self.height = world.SECHEIGHT * world.SECTIONS if wld.anvil else world.CHEIGHT
         self.rotate = 0
         
-        self.world = world
+        self.world = wld
         self.colours = self._load_colours(colours or 'colours.csv')
         self.biomes = self._load_colours(biomes or 'biomes.csv')
         
