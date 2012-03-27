@@ -14,16 +14,6 @@ SECHEIGHT = 16
 CHEIGHT = 128
 
 
-def crop_coords(self, coords, bcrop=None, scale=1):
-    """Filter a list of coordinates by a bounding box.
-    Coordinates are at block scope, divided by scale if specified."""
-    if bcrop is None:
-        return coords
-    w, e, n, s = (i / scale for i in bcrop)
-    return [(x, z) for (x, z) in coords if w <= x <= e and n <= z <= s]
-
-
-
 class World:
     def __init__(self, path, force_region=0):
         self.path = path
@@ -44,7 +34,7 @@ class World:
         if whitelist is None:
             return self.chunklist
         else:
-            return [(cx, cz) for (cx, cz) in self.chunklist if (cx, cz) in whitelist]
+            return [(cx, cz) for cx, cz in self.chunklist if (cx, cz) in whitelist]
     
     
     def get_chunks(self, whitelist=None):
@@ -66,12 +56,12 @@ class World:
             return self.regionlist
         else:
             region_whitelist = ((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist)
-            return [(rx, rz) for (rx, rz) in self.regionlist if (rx, rz) in region_whitelist]
+            return [(rx, rz) for rx, rz in self.regionlist if (rx, rz) in region_whitelist]
         
         
     def get_regions(self, whitelist=None):
         """Returns a dict of all existing regions (within optional chunk whitelist), indexed by coordinates."""
-        return {(rx, rz): self.regions[rx, rz] for (rx, rz) in self.get_region_list(whitelist)}
+        return {(rx, rz): self.regions[rx, rz] for rx, rz in self.get_region_list(whitelist)}
     
     
     def get_region(self, (rx, rz)):
@@ -96,7 +86,8 @@ class World:
                 elif r == 'r' and ext == 'mcr':
                     regionlist.append((int(rx), int(rz)))
                     
-        self.anvil = 1 if anvillist and not force_region else 0 
+        self.anvil = 1 if anvillist and not force_region else 0
+        print 'World type is {0}'.format('Anvil' if self.anvil else 'McRegion')
         return anvillist if anvillist and not force_region else regionlist
     
     
@@ -115,7 +106,7 @@ class Region:
             return self.chunkinfo.keys()
         else:
             rx, rz = self.coords
-            return [(cx, cz) for (cx, cz) in self.chunkinfo.keys()
+            return [(cx, cz) for cx, cz in self.chunkinfo.keys()
                     if (rx * RSIZE + cx, rz * RSIZE + cz) in whitelist]
     
     
@@ -127,7 +118,7 @@ class Region:
             return []
         
         with open(self.path, 'rb') as rfile:
-            return {(cx, cz): self._read_chunk((cx, cz), rfile) for (cx, cz) in chunklist}
+            return {(cx, cz): self._read_chunk((cx, cz), rfile) for cx, cz in chunklist}
         
         
     def _read_chunk_info(self):
@@ -201,7 +192,7 @@ class Chunk:
         return [tag[2] for tag in container if tag[1] == name][0]
     
     
-    def get_heightmap(self):
+    def get_heights(self):
         hmapdata = self.find_tag('HeightMap')
         hmap = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
         for z in range(CSIZE):
@@ -237,6 +228,15 @@ class Chunk:
 class AnvilChunk(Chunk):
     def __init__(self, data):
         self.tags = nbt.NBT(data).tags[0][2][0][2]
+        
+        
+    def get_data(self, type='block'):
+        if type == 'heightmap':
+            return self.get_heightmap()
+        elif type == 'biome':
+            return self.get_biomes()
+        else:
+            return self.get_blocks()
         
         
     def get_blocks(self):

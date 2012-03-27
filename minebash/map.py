@@ -14,26 +14,16 @@ class Map:
         self.biomes = self._load_colours(biomes or 'biomes.csv')
         
         
-    def draw_map(self, imgpath, limits=None):
+    def draw_map(self, imgpath, bcrop=None):
         """Gets map data from a subclass method, and saves it to an image file."""
-        image = self._generate_map_data(limits)
+        image = self._generate_map(bcrop=bcrop)
         image.save(imgpath)
         print 'saved image to', imgpath
         
     
-    def draw_region(self, (rx, rz), bcrop=None, type='block'):
+    def draw_region(self, (rx, rz), type):
         """Draw a single region; that is, the data from a single region file."""
-        region = self.world.get_region((rx, rz))
-        
-        if type not in ('block', 'heightmap', 'biome'):
-            type = 'block'
-        
-        if type == 'heightmap':
-            return self._generate_region_heightmap(region, bcrop)
-        elif type == 'biome':
-            return self._generate_region_biomes(region, bcrop)
-        else:
-            return self._generate_region_map(region, bcrop)
+        return self._generate_region_map(self.world.get_region((rx, rz)), type)
     
     
     def draw_region_at_point(self, (x, z)):
@@ -65,16 +55,36 @@ class Map:
         return self
         
         
-    def _get_extremes(self, coords, scale=1):
-        """Return the highest and lowest values on both axes."""
-        xrange = [x for (x, z) in coords]
-        zrange = [z for (x, z) in coords]
-        return (
-            min(xrange) * scale,
-            max(xrange) * scale + scale - 1,
-            min(zrange) * scale,
-            max(zrange) * scale + scale - 1
-            )
+    def _crop_coords(self, coords, bcrop=None, scale=1):
+        """Filter a list of coordinates by a bounding box.
+        Coordinates are at block scope, divided by scale if specified."""
+        if bcrop is None:
+            return coords
+        w, e, n, s = (i / scale for i in bcrop)
+        return [(x, z) for x, z in coords if w <= x <= e and n <= z <= s]
+    
+    
+    def _scale_coords_down(self, coords, scale=1):
+        """Scale down a set of coordinates."""
+        return sorted(set((x / scale, z / scale) for x, z in coords))
+
+    
+    def _get_edges(self, coords):
+        """Return the highest and lowest values on both axes of a set of coordinates
+        (i.e. the coordinates' bounding box)."""
+        return (min(x for x, z in coords),
+                max(x for x, z in coords),
+                min(z for x, z in coords),
+                max(z for x, z in coords))
+        
+        
+    def _scale_edges_up(self, edges, scale=1):
+        """Scale up the coordinates of a bounding box."""
+        w, e, n, s = edges
+        return (w * scale,
+                e * scale + scale - 1,
+                n * scale,
+                s * scale + scale - 1)
         
         
     def _load_colours(self, path):

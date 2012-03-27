@@ -109,7 +109,7 @@ class MBWorldTab(QtGui.QWidget):
     def draw_map(self, refresh=False):
         regions = self.world.get_region_list()
         for rnum, (rx, rz) in enumerate(regions):
-            print 'trying region {0}/{1}...'.format(rnum + 1, len(regions))
+            print 'region {0} of {1}:'.format(rnum + 1, len(regions))
             img = self.get_region_image((rx, rz), refresh=refresh)
                 
             if self.biomecheck.isChecked():
@@ -128,7 +128,7 @@ class MBWorldTab(QtGui.QWidget):
         
         
     def get_region_image(self, (rx, rz), type='block', refresh=False):
-        if type not in ('block', 'biome', 'heightmap'):
+        if type not in ('block', 'biome', 'height'):
             type = 'block'
             
         cachepath = os.path.join(os.getcwd(), 'cache', self.world.name)
@@ -140,7 +140,8 @@ class MBWorldTab(QtGui.QWidget):
             img = Image.open(path)
             print 'found', path
         else:
-            img = self.map.draw_region((rx, rz), type=type)
+            print 'preparing to draw {0} map at region {1}'.format(type, (rx, rz))
+            img = self.map.draw_region((rx, rz), type)
             img.save(path)
             print 'cached', path
             
