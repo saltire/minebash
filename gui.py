@@ -17,6 +17,8 @@ class MineBash(QtGui.QMainWindow):
         self.colours = colours
         self.biomes = biomes
         
+        self.cliptab = None
+        
         self.init_ui()
         self.show()
         
@@ -70,41 +72,65 @@ class MBWorldTab(QtGui.QWidget):
     def init_ui(self):
         mainlayout = QtGui.QVBoxLayout(self)
         mainlayout.setContentsMargins(10, 10, 10, 10)
-        mainlayout.setSpacing(10)
+        mainlayout.setSpacing(0)
 
         self.scene = QtGui.QGraphicsScene(self)
         self.scene.setBackgroundBrush(QtGui.QColor(25, 25, 25))
         view = QtGui.QGraphicsView(self.scene, self)
-        frame = QtGui.QFrame(self)
-        
+        tools = QtGui.QFrame(self)
+        info = QtGui.QFrame(self)
         mainlayout.addWidget(view)
-        mainlayout.addWidget(frame)
+        mainlayout.addWidget(info)
+        mainlayout.addWidget(tools)
         
-        framelayout = QtGui.QHBoxLayout(frame)
-        framelayout.setSpacing(10)
-        framelayout.setSizeConstraint(QtGui.QLayout.SetMinimumSize)
+        # tools row
+        
+        toolslayout = QtGui.QHBoxLayout(tools)
+        toolslayout.setSpacing(10)
+        toolslayout.setSizeConstraint(QtGui.QLayout.SetMinimumSize)
+        
+        self.copy = QtGui.QPushButton('Copy', self)
+        self.copy.clicked.connect(self.copy_chunks)
+        toolslayout.addWidget(self.copy)
+        
+        self.paste = QtGui.QPushButton('Paste', self)
+        self.paste.clicked.connect(self.paste_chunks)
+        if self.win.cliptab is None:
+            self.paste.setDisabled(1)
+        toolslayout.addWidget(self.paste)
+        
+        self.copylabel = QtGui.QLabel('')
+        toolslayout.addWidget(self.copylabel)
+        
+        toolslayout.addStretch()
+        
+        generate = QtGui.QPushButton('Generate', self)
+        generate.clicked.connect(lambda: self.draw_map(refresh=1))
+        toolslayout.addWidget(generate)
+        
+        # info row
+        
+        infolayout = QtGui.QHBoxLayout(info)
+        infolayout.setSpacing(10)
+        infolayout.setSizeConstraint(QtGui.QLayout.SetMinimumSize)
 
         self.labels = {}
         for label in ('Region', 'Chunk', 'Block'):
             self.labels[label] = QtGui.QLabel('{0}:'.format(label))
-            self.labels[label].setMinimumSize(80, 40)
-            framelayout.addWidget(self.labels[label])
+            self.labels[label].setMinimumSize(100, 30)
+            infolayout.addWidget(self.labels[label])
             
         self.selectlabel = QtGui.QLabel('Chunks selected:')
-        self.selectlabel.setMinimumSize(100, 40)
-        framelayout.addWidget(self.selectlabel)
+        self.selectlabel.setMinimumSize(100, 30)
+        infolayout.addWidget(self.selectlabel)
         
-        framelayout.addStretch()
+        infolayout.addStretch()
         
         self.biomecheck = QtGui.QCheckBox('Show biomes')
-        self.biomecheck.setMinimumSize(80, 40)
+        self.biomecheck.setMinimumSize(80, 30)
         self.biomecheck.stateChanged.connect(lambda: self.draw_map())
-        framelayout.addWidget(self.biomecheck)
+        infolayout.addWidget(self.biomecheck)
 
-        generate = QtGui.QPushButton('Generate', self)
-        generate.clicked.connect(lambda: self.draw_map(refresh=1))
-        framelayout.addWidget(generate)
-        
         
     def draw_map(self, refresh=False):
         regions = self.world.get_region_list()
@@ -178,6 +204,48 @@ class MBWorldTab(QtGui.QWidget):
         self.labels['Block'].setText('Block: {0}, {1}'.format(x, z))
         self.labels['Chunk'].setText('Chunk: {0}, {1}'.format(cx, cz))
         self.labels['Region'].setText('Region: {0}, {1}'.format(rx, rz))
+        
+        
+    def copy_chunks(self):
+        if self.selected:
+            self.win.cliptab = self
+            self.copylabel.setText('{0} chunks copied'.format(len(self.selected)))
+            
+            # enable paste buttons
+            for index in range(self.win.tabs.count()):
+                self.win.tabs.widget(index).paste.setEnabled(1)
+
+                
+    def get_clip_chunks(self):
+        chunks = {}
+        
+        if self.selected:
+            cxmin = min(cx for cx, cz in self.selected)
+            cxmax = max(cx for cx, cz in self.selected)
+            czmin = min(cz for cx, cz in self.selected)
+            czmax = max(cz for cx, cz in self.selected)
+            w = (cxmax + 1 - cxmin) * world.CSIZE
+            h = (czmax + 1 - czmin) * world.CSIZE
+            
+            brsize = world.CSIZE * world.RSIZE
+            
+            for cx, cz in self.selected:
+                bx, bz = cx * world.CSIZE, cz * world.CSIZE
+                regionmap = self.scene.items(bx, bz, world.CSIZE, world.CSIZE)[-1].pixmap()
+                chunkmap = regionmap.copy(bx % brsize, bz % brsize, world.CSIZE, world.CSIZE)
+                chunks[cx, cz] = QtGui.QGraphicsPixmapItem(chunkmap)
+            
+        return chunks
+            
+            
+    def paste_chunks(self):
+        if self.win.cliptab is not None:
+            clip = QtGui.QGraphicsItemGroup()
+            
+            for (cx, cz), chunk in self.win.cliptab.get_clip_chunks().items():
+                chunk.setPos(cx * world.CSIZE, cz * world.CSIZE)
+                clip.addToGroup(chunk)
+                self.scene.addItem(chunk)
         
         
         
