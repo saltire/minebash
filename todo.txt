@@ -6,10 +6,14 @@ cache:
 - cache worlds by path rather than by name, possibly inside the world folder
 - cache a timestamp and only update chunks that have a more recent mtime
 
+selection:
+- make box selection conditional on tool button being pressed
+- ctrl or shift to do negative selection
+
 copy and paste:
-- copy and paste chunks from one world to another
-- drag a pasted selection around
-- save a world with pasted chunks substituted in
+- show a distinct state when a selection has been pasted but not merged
+- drag a pasted selection around, and merge it
+- save a world with merged chunks substituted in
 
 rendering:
 - rotation on orthographic map
