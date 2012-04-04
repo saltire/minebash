@@ -50,9 +50,10 @@ class World:
         return self.regions[rx, rz].read_chunks([(cx, cz)])
     
     
-    def get_region_chunk_list(self, (rx, rz)):
-        """Returns a list of local chunk coordinates present in the given region."""
-        return self.regions[rx, rz].get_chunk_list()
+    def get_region_chunk_list(self, (rx, rz), whitelist=None):
+        """Returns a list of LOCAL chunk coordinates existing in the given region file,
+        within an optional whitelist of GLOBAL chunk coordinates.."""
+        return self.regions[rx, rz].get_chunk_list(whitelist)
 
 
     def get_region_list(self, whitelist=None):
@@ -60,7 +61,7 @@ class World:
         if whitelist is None:
             return self.regionlist
         else:
-            region_whitelist = ((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist)
+            region_whitelist = set((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist)
             return [(rx, rz) for rx, rz in self.regionlist if (rx, rz) in region_whitelist]
         
         

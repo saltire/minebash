@@ -7,7 +7,6 @@ cache:
 - cache a timestamp and only update chunks that have a more recent mtime
 
 selection:
-- make box selection conditional on tool button being pressed
 - ctrl or shift to do negative selection
 
 copy and paste:
