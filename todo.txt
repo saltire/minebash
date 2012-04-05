@@ -8,11 +8,14 @@ cache:
 
 selection:
 - ctrl or shift to do negative selection
+- add clear selection tool
 
 copy and paste:
-- show a distinct state when a selection has been pasted but not merged
-- drag a pasted selection around, and merge it
+- show number of pasted chunks and from which world
+- disable tools when a selection has been pasted but not merged
+- merge a pasted selection into a world
 - save a world with merged chunks substituted in
+- rotate a selection
 
 rendering:
 - rotation on orthographic map

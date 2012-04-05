@@ -11,7 +11,7 @@ from minebash import world
 
 
 class MineBash(QtGui.QMainWindow):
-    def __init__(self, wpath=None, colours=None, biomes=None):
+    def __init__(self, wpaths=None, colours=None, biomes=None):
         QtGui.QMainWindow.__init__(self)
         
         self.colours = colours
@@ -22,10 +22,11 @@ class MineBash(QtGui.QMainWindow):
         self.init_ui()
         self.show()
         
-        if wpath:
-            startworld = world.World(wpath)
-            tab = MBWorldTab(self, startworld)
-            self.tabs.addTab(tab, startworld.name)
+        if wpaths:
+            for wpath in wpaths.split(','):
+                startworld = world.World(wpath)
+                tab = MBWorldTab(self, startworld)
+                self.tabs.addTab(tab, startworld.name)
         
         
     def init_ui(self):
@@ -81,10 +82,10 @@ class MBWorldTab(QtGui.QWidget):
         
         self.win = win
         self.world = wld
-        self.map = orthomap.OrthoMap(self.world, self.win.colours, self.win.biomes)
         
         self.chunks = {} # dict of chunks indexed by coords
         self.selected = set() # currently selected chunks in this world
+        self.select = True # whether tools will select or deselect chunks
         self.paste = False # whether a pasted, unmerged selection exists in this tab
         
         self.init_ui()
@@ -157,7 +158,7 @@ class MBWorldTab(QtGui.QWidget):
         for rnum, (rx, rz) in enumerate(regions):
             print 'region {0} of {1}:'.format(rnum + 1, len(regions))
             
-            for (cx, cz), img in self.get_region_blended_images((rx, rz), refresh).iteritems():
+            for (cx, cz), img in self.get_region_blended_images(self.world, (rx, rz), refresh).iteritems():
                 data = img.tostring('raw', 'BGRA')
                 if (cx, cz) not in self.chunks:
                     self.chunks[cx, cz] = MBMapChunk(self, (cx, cz))
@@ -166,24 +167,24 @@ class MBWorldTab(QtGui.QWidget):
                 self.chunks[cx, cz].setPixmap(QtGui.QPixmap.fromImage(QtGui.QImage(data, world.CSIZE, world.CSIZE, QtGui.QImage.Format_ARGB32)))
                 
         if self.paste:
-            print 'redrawing pasted chunks'
+            print 'redrawing pasted chunks from', self.paste.wpath
             
+            pworld = world.World(self.paste.wpath)
             chunklist = self.paste.chunks.keys()
-            regions = world.World(self.paste.wpath).get_region_list(chunklist)
-            for rx, rz in regions:
-                for (cx, cz), img in self.get_region_blended_images((rx, rz), refresh, chunklist).iteritems():
+            for rx, rz in pworld.get_region_list(chunklist):
+                for (cx, cz), img in self.get_region_blended_images(pworld, (rx, rz), refresh, chunklist).iteritems():
                     data = img.tostring('raw', 'BGRA')
                     self.paste.chunks[cx, cz].setPixmap(QtGui.QPixmap.fromImage(QtGui.QImage(data, world.CSIZE, world.CSIZE, QtGui.QImage.Format_ARGB32)))
                     
         print 'done.'
         
         
-    def get_region_blended_images(self, (rx, rz), refresh=False, whitelist=None):
+    def get_region_blended_images(self, wld, (rx, rz), refresh=False, whitelist=None):
         imgs = {}
         
-        cimgs = self.get_region_chunk_images((rx, rz), 'block', refresh, whitelist)
+        cimgs = self.get_region_chunk_images(wld, (rx, rz), 'block', refresh, whitelist)
         if self.biomecheck.isChecked():
-            bcimgs = self.get_region_chunk_images((rx, rz), 'biome', refresh, whitelist)
+            bcimgs = self.get_region_chunk_images(wld, (rx, rz), 'biome', refresh, whitelist)
             
         for (rcx, rcz), img in cimgs.iteritems():
             cx, cz = rx * world.RSIZE + rcx, rz * world.RSIZE + rcz
@@ -195,11 +196,11 @@ class MBWorldTab(QtGui.QWidget):
         return imgs
         
         
-    def get_region_chunk_images(self, (rx, rz), type='block', refresh=False, whitelist=None):
+    def get_region_chunk_images(self, wld, (rx, rz), type='block', refresh=False, whitelist=None):
         if type not in ('block', 'biome', 'height'):
             type = 'block'
             
-        cachepath = os.path.join(os.getcwd(), 'cache', self.world.name)
+        cachepath = os.path.join(os.getcwd(), 'cache', wld.name)
         if not os.path.exists(cachepath):
             os.makedirs(cachepath)
             
@@ -209,12 +210,12 @@ class MBWorldTab(QtGui.QWidget):
             print 'found', path
         else:
             print 'preparing to draw {0} map at region {1}'.format(type, (rx, rz))
-            img = self.map.draw_region((rx, rz), type)
+            img = orthomap.OrthoMap(wld, self.win.colours, self.win.biomes).draw_region((rx, rz), type)
             img.save(path)
             print 'cached', path
             
         return {(cx, cz): img.crop((cx * world.CSIZE, cz * world.CSIZE, (cx + 1) * world.CSIZE, (cz + 1) * world.CSIZE))
-                for cx, cz in self.world.get_region_chunk_list((rx, rz), whitelist)}
+                for cx, cz in wld.get_region_chunk_list((rx, rz), whitelist)}
         
         
     def clear_labels(self):
@@ -264,8 +265,9 @@ class MBWorldTab(QtGui.QWidget):
             
             
     def highlight_chunk(self, (cx, cz)):
-        self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).setSelected(1)
-        self.selectlabel.setText('Chunks selected: {0}'.format(len(self.selected) if self.selected else ''))
+        if (cx, cz) in self.chunks:
+            self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).setSelected(1)
+            self.selectlabel.setText('Chunks selected: {0}'.format(len(self.selected) if self.selected else ''))
 
         
     def update_selection(self):
@@ -367,10 +369,15 @@ class MBMapChunk(QtGui.QGraphicsPixmapItem):
         if self.tab.paste:
             painter.fillRect(self.pixmap().rect(), QtGui.QColor(0, 0, 0, 128))
         else:
-            if self.coords in self.tab.selected:
-                painter.fillRect(self.pixmap().rect(), QtGui.QColor(255, 255, 255, 128))
-            if self in self.tab.scene.selectedItems():
+            # block is being selected
+            if self in self.tab.scene.selectedItems() and self.tab.select and self.coords not in self.tab.selected:
+                painter.fillRect(self.pixmap().rect(), QtGui.QColor(0, 255, 0, 128))
+            # block is being deselected
+            elif self in self.tab.scene.selectedItems() and not self.tab.select and self.coords in self.tab.selected:
                 painter.fillRect(self.pixmap().rect(), QtGui.QColor(255, 0, 0, 128))
+            # block is already selected
+            elif self.coords in self.tab.selected:
+                painter.fillRect(self.pixmap().rect(), QtGui.QColor(255, 255, 255, 128))
         
     
         
