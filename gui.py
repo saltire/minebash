@@ -65,6 +65,7 @@ class MineBash(QtGui.QMainWindow):
         
         
     def open(self):
+        """Open a file dialog and return a world path."""
         dir = QtGui.QFileDialog.getExistingDirectory()
         if os.path.exists(os.path.join(dir, 'level.dat')):
             tab = MBWorldTab(self, world.World(dir))
@@ -151,6 +152,8 @@ class MBWorldTab(QtGui.QWidget):
 
         
     def draw_map(self, refresh=False):
+        """Gets images of all the chunks in the current tab's world, as well as any pasted in,
+         and adds their pixmaps to the view."""
         if refresh:
             self.chunks = {}
         
@@ -158,7 +161,7 @@ class MBWorldTab(QtGui.QWidget):
         for rnum, (rx, rz) in enumerate(regions):
             print 'region {0} of {1}:'.format(rnum + 1, len(regions))
             
-            for (cx, cz), img in self.get_region_blended_images(self.world, (rx, rz), refresh).iteritems():
+            for (cx, cz), img in self.get_region_chunk_images(self.world, (rx, rz), refresh).iteritems():
                 data = img.tostring('raw', 'BGRA')
                 if (cx, cz) not in self.chunks:
                     self.chunks[cx, cz] = MBMapChunk(self, (cx, cz))
@@ -172,34 +175,31 @@ class MBWorldTab(QtGui.QWidget):
             pworld = world.World(self.paste.wpath)
             chunklist = self.paste.chunks.keys()
             for rx, rz in pworld.get_region_list(chunklist):
-                for (cx, cz), img in self.get_region_blended_images(pworld, (rx, rz), refresh, chunklist).iteritems():
+                for (cx, cz), img in self.get_region_chunk_images(pworld, (rx, rz), refresh, chunklist).iteritems():
                     data = img.tostring('raw', 'BGRA')
                     self.paste.chunks[cx, cz].setPixmap(QtGui.QPixmap.fromImage(QtGui.QImage(data, world.CSIZE, world.CSIZE, QtGui.QImage.Format_ARGB32)))
                     
         print 'done.'
         
         
-    def get_region_blended_images(self, wld, (rx, rz), refresh=False, whitelist=None):
-        imgs = {}
-        
-        cimgs = self.get_region_chunk_images(wld, (rx, rz), 'block', refresh, whitelist)
+    def get_region_chunk_images(self, wld, (rx, rz), refresh=False, whitelist=None):
+        """Gets an image of a region and chops it into images of all chunks in the region.
+        Optionally adds a biome overlay first."""
+        img = self.get_region_image(wld, (rx, rz), 'block', refresh)
         if self.biomecheck.isChecked():
-            bcimgs = self.get_region_chunk_images(wld, (rx, rz), 'biome', refresh, whitelist)
+            img = Image.blend(img, self.get_region_image(wld, (rx, rz), 'biome', refresh), 0.5)
             
-        for (rcx, rcz), img in cimgs.iteritems():
-            cx, cz = rx * world.RSIZE + rcx, rz * world.RSIZE + rcz
-            if self.biomecheck.isChecked():
-                imgs[cx, cz] = Image.blend(img, bcimgs[rcx, rcz], 0.5)
-            else:
-                imgs[cx, cz] = img
-                
-        return imgs
-        
-        
-    def get_region_chunk_images(self, wld, (rx, rz), type='block', refresh=False, whitelist=None):
+        return {(rx * world.RSIZE + cx, rz * world.RSIZE + cz):
+                    img.crop((cx * world.CSIZE, cz * world.CSIZE, (cx + 1) * world.CSIZE, (cz + 1) * world.CSIZE))
+                for cx, cz in wld.get_region_chunk_list((rx, rz), whitelist)}
+    
+    
+    def get_region_image(self, wld, (rx, rz), type='block', refresh=False, whitelist=None):
+        """Returns an image of a region. Will use cached images if available, unless refresh specified.
+        Caches images in a subdirectory for the current world."""
         if type not in ('block', 'biome', 'height'):
             type = 'block'
-            
+        
         cachepath = os.path.join(os.getcwd(), 'cache', wld.name)
         if not os.path.exists(cachepath):
             os.makedirs(cachepath)
@@ -213,17 +213,18 @@ class MBWorldTab(QtGui.QWidget):
             img = orthomap.OrthoMap(wld, self.win.colours, self.win.biomes).draw_region((rx, rz), type)
             img.save(path)
             print 'cached', path
-            
-        return {(cx, cz): img.crop((cx * world.CSIZE, cz * world.CSIZE, (cx + 1) * world.CSIZE, (cz + 1) * world.CSIZE))
-                for cx, cz in wld.get_region_chunk_list((rx, rz), whitelist)}
+
+        return img
         
         
     def clear_labels(self):
+        """Clears the coordinate labels."""
         for text, label in self.labels.items():
             label.setText('{0}:'.format(text))
         
         
     def update_labels(self, x, z):
+        """Updates coordinate labels with the region, chunk, and block under the mouse cursor."""
         cx, cz = x / world.CSIZE, z / world.CSIZE
         rx, rz = cx / world.CSIZE, cz / world.CSIZE
         self.labels['Block'].setText('Block: {0}, {1}'.format(x, z))
@@ -232,6 +233,7 @@ class MBWorldTab(QtGui.QWidget):
         
         
     def copy_chunks(self):
+        """Sets this tab as the current tab to copy from, and enables the paste tool."""
         if self.selected:
             self.win.cliptab = self
             self.copylabel.setText('{0} chunks copied'.format(len(self.selected)))
@@ -242,10 +244,13 @@ class MBWorldTab(QtGui.QWidget):
 
                 
     def get_clip_chunkmaps(self):
+        """Returns the pixmaps of all the currently selected chunks on this tab."""
         return {(cx, cz): self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).pixmap() for cx, cz in self.selected}
     
     
     def paste_chunks(self):
+        """Grabs the pixmaps of the selected chunks from the copy tab, adds them to this tab's view,
+        and puts this tab into paste mode."""
         if self.win.cliptab is not None:
             self.paste = MBPaste(self.win.cliptab.world.path)
             
@@ -265,12 +270,13 @@ class MBWorldTab(QtGui.QWidget):
             
             
     def highlight_chunk(self, (cx, cz)):
+        """Mark a chunk to be highlighted by a selection tool."""
         if (cx, cz) in self.chunks:
             self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).setSelected(1)
-            self.selectlabel.setText('Chunks selected: {0}'.format(len(self.selected) if self.selected else ''))
 
         
     def update_selection(self):
+        """Adds or removes all highlighted chunks from the selection."""
         for chunk in self.scene.selectedItems():
             self.selected.add(chunk.coords) if self.select else self.selected.discard(chunk.coords)
             chunk.setSelected(0)
@@ -287,10 +293,12 @@ class MBPaste(QtGui.QGraphicsItemGroup):
         
         
     def mousePressEvent(self, event):
+        """Records the starting point of a mouse drag on the pasted selection."""
         self.drag_origin = event.scenePos().x(), event.scenePos().y()
         
         
     def mouseMoveEvent(self, event):
+        """Moves the pasted selection aroud the view, in chunk-sized increments."""
         ox, oz = self.drag_origin
         dx, dz = int(event.scenePos().x() - ox), int(event.scenePos().y() - oz)
         mx, mz = 0, 0
@@ -315,6 +323,7 @@ class MBMapView(QtGui.QGraphicsView):
         
         
     def mousePressEvent(self, event):
+        """Starts a rubber band if the box tool is selected."""
         self.setDragMode(QtGui.QGraphicsView.RubberBandDrag if self.tab.win.box.isChecked()
                          else QtGui.QGraphicsView.NoDrag)
         QtGui.QGraphicsView.mousePressEvent(self, event)
@@ -336,17 +345,21 @@ class MBMapChunk(QtGui.QGraphicsPixmapItem):
         self.coords = cx, cz
         
         
-    def hoverLeaveEvent(self, event):
-        self.tab.clear_labels()
-
-
     def hoverMoveEvent(self, event):
+        """Update the coordinate labels when hovering on a chunk area."""
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
         self.tab.update_labels(x, z)
         
         
+    def hoverLeaveEvent(self, event):
+        """Clears the coordinate labels when leaving a chunk area."""
+        self.tab.clear_labels()
+
+
     def mousePressEvent(self, event):
+        """Sets the selection tools to select or deselect, depending where they click.
+        Also handles chunk highlighting if using the brush tool."""
         self.tab.select = True if self.coords not in self.tab.selected else False
         
         if self.tab.win.brush.isChecked():
@@ -356,6 +369,7 @@ class MBMapChunk(QtGui.QGraphicsPixmapItem):
 
     
     def mouseMoveEvent(self, event):
+        """Handles chunk highlighting for the brush tool."""
         pos = event.scenePos()
         x, z = int(pos.x()), int(pos.y())
         cx, cz = x / world.CSIZE, z / world.CSIZE
@@ -363,6 +377,7 @@ class MBMapChunk(QtGui.QGraphicsPixmapItem):
         
         
     def paint(self, painter, option, widget=None):
+        """Modify the colour of a chunk based on whether it is highlighted or selected or not."""
         option.state &= not QtGui.QStyle.State_Selected
         QtGui.QGraphicsPixmapItem.paint(self, painter, option, widget)
         
