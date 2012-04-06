@@ -17,7 +17,7 @@ class MineBash(QtGui.QMainWindow):
         self.colours = colours
         self.biomes = biomes
         
-        self.cliptab = None
+        self.cliptab = None # the tab chunks have been copied from
         
         self.init_ui()
         self.show()
@@ -66,7 +66,7 @@ class MineBash(QtGui.QMainWindow):
         
         self.mergebtn = tools.addAction('Merge')
         self.mergebtn.setDisabled(1)
-        self.copybtn.triggered.connect(lambda: self.tabs.currentWidget().merge_chunks())
+        self.mergebtn.triggered.connect(lambda: self.tabs.currentWidget().merge_chunks())
     
 
     def open(self):
@@ -85,8 +85,10 @@ class MineBash(QtGui.QMainWindow):
         """On switching to a new tab, enables and disables tools in the toolbar."""
         tab = self.tabs.currentWidget()
         
+        self.toolgrp.setDisabled(1 if tab.paste else 0)
         self.copybtn.setEnabled(1 if tab.selected else 0)
         self.pastebtn.setEnabled(1 if self.cliptab and not tab.paste else 0)
+        self.mergebtn.setEnabled(1 if tab.paste else 0)
             
             
 
@@ -99,8 +101,10 @@ class MBWorldTab(QtGui.QWidget):
         
         self.chunks = {} # dict of chunks indexed by coords
         self.selected = set() # currently selected chunks in this world
+        self.copied = set() # last copied chunks in this world
         self.select = True # whether tools will select or deselect chunks
-        self.paste = False # whether a pasted, unmerged selection exists in this tab
+        self.paste = None # a pasted, unmerged selection of chunks
+        self.merged = {} # dict of merged chunk info
         
         self.init_ui()
         
@@ -270,6 +274,7 @@ class MBWorldTab(QtGui.QWidget):
         """Sets this tab as the current tab to copy from, and enables the paste tool."""
         if self.selected:
             self.win.cliptab = self
+            self.copied = self.selected.copy()
             self.copylabel.setText('{0} chunks copied'.format(len(self.selected)))
             
             # enable paste buttons
@@ -279,7 +284,7 @@ class MBWorldTab(QtGui.QWidget):
                 
     def get_clip_chunkmaps(self):
         """Returns the pixmaps of all the currently selected chunks on this tab."""
-        return {(cx, cz): self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).pixmap() for cx, cz in self.selected}
+        return {(cx, cz): self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).pixmap() for cx, cz in self.copied}
     
     
     def paste_chunks(self):
@@ -290,10 +295,12 @@ class MBWorldTab(QtGui.QWidget):
             
             # create pasted selection in this view
             for (cx, cz), chunkmap in self.win.cliptab.get_clip_chunkmaps().iteritems():
-                self.paste.chunks[cx, cz] = QtGui.QGraphicsPixmapItem(chunkmap)
-                self.paste.chunks[cx, cz].setPos(cx * world.CSIZE, cz * world.CSIZE)
-                self.scene.addItem(self.paste.chunks[cx, cz])
-                self.paste.addToGroup(self.paste.chunks[cx, cz])
+                chunk = MBMapChunk(self, (cx, cz))
+                chunk.setPixmap(chunkmap)
+                chunk.setPos(cx * world.CSIZE, cz * world.CSIZE)
+                self.scene.addItem(chunk)
+                self.paste.addToGroup(chunk)
+                self.paste.chunks[cx, cz] = chunk
 
             # show paste and darken view
             self.scene.addItem(self.paste)
@@ -315,7 +322,17 @@ class MBWorldTab(QtGui.QWidget):
     def merge_chunks(self):
         """Merges a pasted selection of chunks into the current view's chunks,
         and allows further editing of the world."""
-        pass
+        for (ocx, ocz), chunk in self.paste.chunks.iteritems():
+            cx, cz = int(chunk.scenePos().x() / world.CSIZE), int(chunk.scenePos().y() / world.CSIZE)
+            chunk.coords = cx, cz
+            self.merged[cx, cz] = self.paste.wpath, (ocx, ocz)
+            
+        self.scene.destroyItemGroup(self.paste)
+        self.paste = None
+        self.scene.update()
+        
+        self.win.toolgrp.setEnabled(1)
+        self.win.mergebtn.setDisabled(1)
         
         
         
@@ -347,7 +364,7 @@ class MBPaste(QtGui.QGraphicsItemGroup):
         self.drag_origin = ox + mx, oz + mz
         
         
-
+        
 class MBMapView(QtGui.QGraphicsView):
     def __init__(self, scene, tab):
         QtGui.QGraphicsView.__init__(self, scene)
@@ -416,7 +433,7 @@ class MBMapChunk(QtGui.QGraphicsPixmapItem):
         option.state &= not QtGui.QStyle.State_Selected
         QtGui.QGraphicsPixmapItem.paint(self, painter, option, widget)
         
-        if self.tab.paste:
+        if self.tab.paste and self not in self.tab.paste.chunks.values():
             painter.fillRect(self.pixmap().rect(), QtGui.QColor(0, 0, 0, 128))
         else:
             # block is being selected
