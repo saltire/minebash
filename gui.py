@@ -44,6 +44,8 @@ class MineBash(QtGui.QMainWindow):
         tools = QtGui.QToolBar(self)
         self.addToolBar(tools)
         
+        # selection tools
+        
         self.toolgrp = QtGui.QActionGroup(tools)
 
         self.brush = tools.addAction('Brush')
@@ -53,6 +55,8 @@ class MineBash(QtGui.QMainWindow):
         self.box = tools.addAction('Box')
         self.box.setCheckable(1)
         self.toolgrp.addAction(self.box)
+        
+        # clipboard tools
         
         tools.addSeparator()
         
@@ -67,6 +71,19 @@ class MineBash(QtGui.QMainWindow):
         self.mergebtn = tools.addAction('Merge')
         self.mergebtn.setDisabled(1)
         self.mergebtn.triggered.connect(lambda: self.tabs.currentWidget().merge_chunks())
+        
+        self.cancelbtn = tools.addAction('Cancel Merge')
+        self.cancelbtn.setDisabled(1)
+        self.cancelbtn.triggered.connect(lambda: self.tabs.currentWidget().cancel_merge())
+        
+        # status bar
+        
+        self.status = self.statusBar()
+        self.status.setSizeGripEnabled(0)
+        self.status.setContentsMargins(10, 0, 10, 0)
+        
+        self.copylabel = QtGui.QLabel('')
+        self.status.addWidget(self.copylabel)
     
 
     def open(self):
@@ -89,6 +106,7 @@ class MineBash(QtGui.QMainWindow):
         self.copybtn.setEnabled(1 if tab.selected else 0)
         self.pastebtn.setEnabled(1 if self.cliptab and not tab.paste else 0)
         self.mergebtn.setEnabled(1 if tab.paste else 0)
+        self.cancelbtn.setEnabled(1 if tab.paste else 0)
             
             
 
@@ -135,8 +153,8 @@ class MBWorldTab(QtGui.QWidget):
         
         tools = QtGui.QButtonGroup()
         
-        self.copylabel = QtGui.QLabel('')
-        toolslayout.addWidget(self.copylabel)
+        self.pastelabel = QtGui.QLabel('')
+        toolslayout.addWidget(self.pastelabel)
         
         toolslayout.addStretch()
         
@@ -275,11 +293,9 @@ class MBWorldTab(QtGui.QWidget):
         if self.selected:
             self.win.cliptab = self
             self.copied = self.selected.copy()
-            self.copylabel.setText('{0} chunks copied'.format(len(self.selected)))
+            self.win.pastebtn.setEnabled(1)
             
-            # enable paste buttons
-            for index in range(self.win.tabs.count()):
-                self.win.pastebtn.setEnabled(1)
+            self.win.copylabel.setText('{0} chunks copied from {1}.'.format(len(self.copied), self.world.name))
 
                 
     def get_clip_chunkmaps(self):
@@ -311,28 +327,37 @@ class MBWorldTab(QtGui.QWidget):
             self.view.ensureVisible(self.paste)
             self.view.setViewportUpdateMode(QtGui.QGraphicsView.MinimalViewportUpdate)
                 
-            # clear selection, and disable copy and pasting
+            # clear selection, update gui
             self.selected.clear()
-            self.win.toolgrp.setDisabled(1)
-            self.win.copybtn.setDisabled(1)
-            self.win.pastebtn.setDisabled(1)
-            self.win.mergebtn.setEnabled(1)
+            self.win.update_toolbar()
+            self.pastelabel.setText('{0} chunks pasted from {1}.'.format(len(self.paste.chunks), self.win.cliptab.world.name))
             
             
     def merge_chunks(self):
         """Merges a pasted selection of chunks into the current view's chunks,
         and allows further editing of the world."""
-        for (ocx, ocz), chunk in self.paste.chunks.iteritems():
+        for chunk in self.paste.chunks.itervalues():
             cx, cz = int(chunk.scenePos().x() / world.CSIZE), int(chunk.scenePos().y() / world.CSIZE)
+            self.merged[cx, cz] = self.paste.wpath, chunk.coords
             chunk.coords = cx, cz
-            self.merged[cx, cz] = self.paste.wpath, (ocx, ocz)
             
+        self.pastelabel.setText('{0} chunks merged.'.format(len(self.paste.chunks)))
         self.scene.destroyItemGroup(self.paste)
         self.paste = None
         self.scene.update()
+        self.win.update_toolbar()
         
-        self.win.toolgrp.setEnabled(1)
-        self.win.mergebtn.setDisabled(1)
+        
+    def cancel_merge(self):
+        """Removes a pasted selection without merging it."""
+        for chunk in self.paste.chunks.itervalues():
+            self.scene.removeItem(chunk)
+            
+        self.pastelabel.setText('')
+        self.scene.destroyItemGroup(self.paste)
+        self.paste = None
+        self.scene.update()
+        self.win.update_toolbar()
         
         
         
