@@ -39,31 +39,36 @@ class MineBash(QtGui.QMainWindow):
         
         self.tabs = QtGui.QTabWidget(self)
         self.setCentralWidget(self.tabs)
+        self.tabs.currentChanged.connect(self.update_toolbar)
         
         tools = QtGui.QToolBar(self)
         self.addToolBar(tools)
         
-        toolgrp = QtGui.QActionGroup(tools)
+        self.toolgrp = QtGui.QActionGroup(tools)
 
         self.brush = tools.addAction('Brush')
         self.brush.setCheckable(1)
-        toolgrp.addAction(self.brush)
+        self.toolgrp.addAction(self.brush)
                 
         self.box = tools.addAction('Box')
         self.box.setCheckable(1)
-        toolgrp.addAction(self.box)
+        self.toolgrp.addAction(self.box)
         
         tools.addSeparator()
         
-        copy = tools.addAction('Copy')
-        copy.triggered.connect(lambda: self.tabs.currentWidget().copy_chunks())
+        self.copybtn = tools.addAction('Copy')
+        self.copybtn.triggered.connect(lambda: self.tabs.currentWidget().copy_chunks())
                
         self.pastebtn = tools.addAction('Paste')
         if self.cliptab is None:
             self.pastebtn.setDisabled(1)
         self.pastebtn.triggered.connect(lambda: self.tabs.currentWidget().paste_chunks())
         
-        
+        self.mergebtn = tools.addAction('Merge')
+        self.mergebtn.setDisabled(1)
+        self.copybtn.triggered.connect(lambda: self.tabs.currentWidget().merge_chunks())
+    
+
     def open(self):
         """Open a file dialog and return a world path."""
         dir = QtGui.QFileDialog.getExistingDirectory()
@@ -74,6 +79,14 @@ class MineBash(QtGui.QMainWindow):
             
         else:
             print 'Not a world dir!'
+    
+    
+    def update_toolbar(self):
+        """On switching to a new tab, enables and disables tools in the toolbar."""
+        tab = self.tabs.currentWidget()
+        
+        self.copybtn.setEnabled(1 if tab.selected else 0)
+        self.pastebtn.setEnabled(1 if self.cliptab and not tab.paste else 0)
             
             
 
@@ -154,9 +167,12 @@ class MBWorldTab(QtGui.QWidget):
     def draw_map(self, refresh=False):
         """Gets images of all the chunks in the current tab's world, as well as any pasted in,
          and adds their pixmaps to the view."""
+         
+        # discard chunk list, as we will be reading fresh from the world file
         if refresh:
             self.chunks = {}
         
+        # redraw all chunks on the map (regenerating image cache if specified)
         regions = self.world.get_region_list()
         for rnum, (rx, rz) in enumerate(regions):
             print 'region {0} of {1}:'.format(rnum + 1, len(regions))
@@ -168,7 +184,8 @@ class MBWorldTab(QtGui.QWidget):
                     self.chunks[cx, cz].setPos(cx * world.CSIZE, cz * world.CSIZE)
                     self.scene.addItem(self.chunks[cx, cz])
                 self.chunks[cx, cz].setPixmap(QtGui.QPixmap.fromImage(QtGui.QImage(data, world.CSIZE, world.CSIZE, QtGui.QImage.Format_ARGB32)))
-                
+            
+        # redraw pasted selection, if any
         if self.paste:
             print 'redrawing pasted chunks from', self.paste.wpath
             
@@ -203,12 +220,14 @@ class MBWorldTab(QtGui.QWidget):
         cachepath = os.path.join(os.getcwd(), 'cache', wld.name)
         if not os.path.exists(cachepath):
             os.makedirs(cachepath)
-            
         path = os.path.join(cachepath, '{0}_{1}.{2}.png'.format(type, rx, rz))
+        
         if os.path.exists(path) and not refresh:
+            # use cached region image
             img = Image.open(path)
             print 'found', path
         else:
+            # draw a new region image and cache it
             print 'preparing to draw {0} map at region {1}'.format(type, (rx, rz))
             img = orthomap.OrthoMap(wld, self.win.colours, self.win.biomes).draw_region((rx, rz), type)
             img.save(path)
@@ -230,6 +249,21 @@ class MBWorldTab(QtGui.QWidget):
         self.labels['Block'].setText('Block: {0}, {1}'.format(x, z))
         self.labels['Chunk'].setText('Chunk: {0}, {1}'.format(cx, cz))
         self.labels['Region'].setText('Region: {0}, {1}'.format(rx, rz))
+            
+            
+    def highlight_chunk(self, (cx, cz)):
+        """Mark a chunk to be highlighted by a selection tool."""
+        if (cx, cz) in self.chunks:
+            self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).setSelected(1)
+
+        
+    def update_selection(self):
+        """Adds or removes all highlighted chunks from the selection."""
+        for chunk in self.scene.selectedItems():
+            self.selected.add(chunk.coords) if self.select else self.selected.discard(chunk.coords)
+            chunk.setSelected(0)
+        self.selectlabel.setText('Chunks selected: {0}'.format(len(self.selected) if self.selected else ''))
+        self.win.copybtn.setEnabled(1 if self.selected else 0)
         
         
     def copy_chunks(self):
@@ -254,33 +288,34 @@ class MBWorldTab(QtGui.QWidget):
         if self.win.cliptab is not None:
             self.paste = MBPaste(self.win.cliptab.world.path)
             
+            # create pasted selection in this view
             for (cx, cz), chunkmap in self.win.cliptab.get_clip_chunkmaps().iteritems():
                 self.paste.chunks[cx, cz] = QtGui.QGraphicsPixmapItem(chunkmap)
                 self.paste.chunks[cx, cz].setPos(cx * world.CSIZE, cz * world.CSIZE)
                 self.scene.addItem(self.paste.chunks[cx, cz])
                 self.paste.addToGroup(self.paste.chunks[cx, cz])
-                
+
+            # show paste and darken view
             self.scene.addItem(self.paste)
+            self.scene.update()
             
+            # move to pasted selection (and update fully to avoid bugs with darkening)
             self.view.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
             self.view.ensureVisible(self.paste)
             self.view.setViewportUpdateMode(QtGui.QGraphicsView.MinimalViewportUpdate)
+                
+            # clear selection, and disable copy and pasting
+            self.selected.clear()
+            self.win.toolgrp.setDisabled(1)
+            self.win.copybtn.setDisabled(1)
+            self.win.pastebtn.setDisabled(1)
+            self.win.mergebtn.setEnabled(1)
             
-            self.scene.update()
             
-            
-    def highlight_chunk(self, (cx, cz)):
-        """Mark a chunk to be highlighted by a selection tool."""
-        if (cx, cz) in self.chunks:
-            self.scene.itemAt(cx * world.CSIZE, cz * world.CSIZE).setSelected(1)
-
-        
-    def update_selection(self):
-        """Adds or removes all highlighted chunks from the selection."""
-        for chunk in self.scene.selectedItems():
-            self.selected.add(chunk.coords) if self.select else self.selected.discard(chunk.coords)
-            chunk.setSelected(0)
-        self.selectlabel.setText('Chunks selected: {0}'.format(len(self.selected) if self.selected else ''))
+    def merge_chunks(self):
+        """Merges a pasted selection of chunks into the current view's chunks,
+        and allows further editing of the world."""
+        pass
         
         
         
@@ -403,14 +438,11 @@ if __name__ == '__main__':
     argp.add_argument('--world', '-w')
     argp.add_argument('--colours', '-c')
     argp.add_argument('--biomes', '-b')
-    
     args = argp.parse_args()
-    
-    wpath = args.world or 'd:\\games\\Minecraft\\server\\loreland' # temp default
     
     app = QtGui.QApplication(sys.argv)
 
-    minebash = MineBash(wpath, args.colours, args.biomes)
+    minebash = MineBash(args.world, args.colours, args.biomes)
 
     sys.exit(app.exec_())
 
