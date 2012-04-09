@@ -16,7 +16,7 @@ class MBPaste(QtGui.QGraphicsItemGroup):
         
         
     def mouseMoveEvent(self, event):
-        """Moves the pasted selection aroud the view, in chunk-sized increments."""
+        """Moves the pasted selection around the view, in chunk-sized increments."""
         ox, oz = self.drag_origin
         dx, dz = int(event.scenePos().x() - ox), int(event.scenePos().y() - oz)
         mx, mz = 0, 0

@@ -84,12 +84,15 @@ class MineBash:
         if tab.merged:
             print 'redrawing merged chunks'
             
+            # merged chunks are indexed by coords in current tab
+            # but images must be generated using coords from original world
             for wld, mchunks in tab.merged.iteritems():
-                chunklist = mchunks.keys()
+                chunklist = [mchunk.coords for mchunk in mchunks.itervalues()]
                 for rx, rz in wld.get_region_list(chunklist):
-                    for (cx, cz), pixmap in self.get_region_chunk_pixmaps(wld, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist).iteritems():
-                        mchunks[cx, cz].setPixmap(pixmap)
-                    
+                    pixmaps = self.get_region_chunk_pixmaps(wld, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist)
+                for mchunk in mchunks.itervalues():
+                    mchunk.setPixmap(pixmaps[mchunk.coords])
+                
         print 'done.'
         
         
