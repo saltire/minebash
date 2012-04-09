@@ -210,7 +210,7 @@ class AnvilRegion(Region):
 class Chunk:
     def __init__(self, data):
         self.cheight = 128
-        self.tags = nbt.NBT(data).tags[0][2][0][2]
+        self.tags = nbt.NBTReader().from_string(data)[0][2][0][2]
 
 
     def find_tag(self, name, container=None):
@@ -254,7 +254,7 @@ class Chunk:
 
 class AnvilChunk(Chunk):
     def __init__(self, data):
-        self.tags = nbt.NBT(data).tags[0][2][0][2]
+        self.tags = nbt.NBTReader().from_string(data)[0][2][0][2]
         
         
     def get_data(self, type='block'):

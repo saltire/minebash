@@ -1,42 +1,55 @@
+import gzip
 import struct
 
-class NBT:
-    def __init__(self, data):
-        """Fill self.tags with all the tags in the given NBT data string."""
-        self.types = [
-            'End',
-            'Byte',
-            'Short',
-            'Integer',
-            'Long',
-            'Float',
-            'Double',
-            'Byte Array',
-            'String',
-            'List',
-            'Compound',
-            'Integer Array'
-            ]
 
+class NBT:
+    types = [
+        'End',
+        'Byte',
+        'Short',
+        'Integer',
+        'Long',
+        'Float',
+        'Double',
+        'Byte Array',
+        'String',
+        'List',
+        'Compound',
+        'Integer Array'
+        ]
+
+
+    
+class NBTReader(NBT):
+    def from_file(self, path):
+        with gzip.open(path) as nbtfile:
+            return self.from_string(nbtfile.read())
+            
+
+    def from_string(self, data):
+        """Fill self.tags with all the tags in the given NBT data string."""
         self.data = data
         self.pointer = 0
-        self.tags = []
-
+        
+        tags = []
         while True:
             tag = self._get_next_tag()
             if not tag:
                 break
-            self.tags.append(tag)
+            tags.append(tag)
+        return tags
 
 
     def _read(self, length):
+        """Read a length of data from the original input, starting at the current
+        pointer value, and advance the pointer."""
         data = self.data[self.pointer:self.pointer + length]
         self.pointer += length
         return data
 
 
     def _get_next_tag(self):
-        """Get the next tag in the file. Returns (name, type, payload)."""
+        """Get the next tag in the file. Returns (type, name, payload)."""
         type_byte = self._read(1)
         if type_byte == '':
             return None
@@ -81,16 +94,17 @@ class NBT:
             return self._read(length)
 
         elif type == 9: # list
-            subtype, length = struct.unpack('>bi', self._read(1))
+            subtype, length = struct.unpack('>bi', self._read(5))
             taglist = [(self.types[subtype], '', self._get_tag_payload(subtype)) for i in range(length)]
             return self.types[subtype], taglist
 
         elif type == 10: # compound
             compound = []
             while True:
-                compound.append(self._get_next_tag())
+                tag = self._get_next_tag()
                 if tag == 0:
                     break
+                compound.append(tag)
             return compound
         
         elif type == 11: # integer array
@@ -98,57 +112,64 @@ class NBT:
             return struct.unpack('>{0}i'.format(length), self._read(length * 4))
         
         
-    def _write_tag(self, type, name, data, subtype=None):
-        header = struct.pack('>bh{0}b'.format(len(name)), type, len(name), name)
-        payload = self._write_tag_payload(data, subtype)
-        return ''.join(header, payload)
+        
+class NBTWriter(NBT):
+    def to_string(self, tags):
+        data = ''
+        for tag in tags:
+            data = ''.join((data, self._write_tag(*tag)))
+            
+        return data
+
+
+    def _write_tag(self, type, name, payload):
+        """Get the binary representation of a tag."""
+        print type, name
+            
+        header = struct.pack('>bh{0}b'.format(len(name)), self.types.index(type), len(name), *[ord(x) for x in name])
+        return ''.join((header, self._write_tag_payload(self.types.index(type), payload)))
         
         
-    def _write_tag_payload(self, type, data, subtype=None):
-        """Get a binary version of a tag."""
+    def _write_tag_payload(self, type, payload):
+        """Get a binary representation of a tag payload."""
         if type == 1: # byte
-            return struct.pack('>b', data)
+            return struct.pack('>b', payload)
 
         elif type == 2: # short
-            return struct.pack('>h', data)
+            return struct.pack('>h', payload)
 
         elif type == 3: # int
-            return struct.pack('>i', data)
+            return struct.pack('>i', payload)
 
         elif type == 4: # long
-            return struct.pack('>q', data)
+            return struct.pack('>q', payload)
 
         elif type == 5: # float
-            return struct.pack('>f', data)
+            return struct.pack('>f', payload)
 
         elif type == 6: # double
-            return struct.pack('>d', data)
+            return struct.pack('>d', payload)
 
         elif type == 7: # byte array
-            return struct.pack('>i{1}b'.format(len(data)), len(data), data)
+            return struct.pack('>i{0}b'.format(len(payload)), len(payload), *payload)
 
         elif type == 8: # string
-            return struct.pack('>h{1}b'.format(len(data)), len(data), data)
+            return struct.pack('>h{0}b'.format(len(payload)), len(payload), *[ord(x) for x in name])
 
         elif type == 9: # list
-            return ''.join(struct.pack('>bi', subtype, len(data)), 
-                           *[self._write_tag_payload(subtype, item) for item in data])
+            subtype, taglist = payload
+            subtype = self.types.index(subtype)
+            return ''.join([struct.pack('>bi', subtype, len(taglist))]
+                            + [self._write_tag_payload(subtype, tag) for type, name, tag in taglist])
 
         elif type == 10: # compound
-            return ''.join(*[self._write_tag(*item) for item in data])
+            return ''.join([self._write_tag(*tag) for tag in payload])
             
         elif type == 11: # integer array
-            return struct.pack('>i{1}i'.format(len(data)), len(data), data)
+            return struct.pack('>i{0}i'.format(len(payload)), len(payload), *payload)
         
         
         
-class NBTFile(NBT):
-    def __init__(self, path):
-        with gzip.open(path) as nbtfile:
-            NBT.__init__(nbtfile.read())
-
-
-
 def validate_nbt_data(type, value):
     numerics = {
         'Byte': ('>b', -128, 127),
