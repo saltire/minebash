@@ -81,24 +81,65 @@ class NBT:
             return self._read(length)
 
         elif type == 9: # list
-            taglist = []
-            subtype = struct.unpack('>b', self._read(1))[0]
-            length = struct.unpack('>i', self._read(4))[0]
-            while len(taglist) < length:
-                taglist.append((self.types[subtype], '', self._get_tag_payload(subtype)))
+            subtype, length = struct.unpack('>bi', self._read(1))
+            taglist = [(self.types[subtype], '', self._get_tag_payload(subtype)) for i in range(length)]
             return self.types[subtype], taglist
 
         elif type == 10: # compound
             compound = []
-            tag = self._get_next_tag()
-            while tag != 0:
-                compound.append(tag)
-                tag = self._get_next_tag()
+            while True:
+                compound.append(self._get_next_tag())
+                if tag == 0:
+                    break
             return compound
         
         elif type == 11: # integer array
             length = struct.unpack('>i', self._read(4))[0]
             return struct.unpack('>{0}i'.format(length), self._read(length * 4))
+        
+        
+    def _write_tag(self, type, name, data, subtype=None):
+        header = struct.pack('>bh{0}b'.format(len(name)), type, len(name), name)
+        payload = self._write_tag_payload(data, subtype)
+        return ''.join(header, payload)
+        
+        
+    def _write_tag_payload(self, type, data, subtype=None):
+        """Get a binary version of a tag."""
+        if type == 1: # byte
+            return struct.pack('>b', data)
+
+        elif type == 2: # short
+            return struct.pack('>h', data)
+
+        elif type == 3: # int
+            return struct.pack('>i', data)
+
+        elif type == 4: # long
+            return struct.pack('>q', data)
+
+        elif type == 5: # float
+            return struct.pack('>f', data)
+
+        elif type == 6: # double
+            return struct.pack('>d', data)
+
+        elif type == 7: # byte array
+            return struct.pack('>i{1}b'.format(len(data)), len(data), data)
+
+        elif type == 8: # string
+            return struct.pack('>h{1}b'.format(len(data)), len(data), data)
+
+        elif type == 9: # list
+            return ''.join(struct.pack('>bi', subtype, len(data)), 
+                           *[self._write_tag_payload(subtype, item) for item in data])
+
+        elif type == 10: # compound
+            return ''.join(*[self._write_tag(*item) for item in data])
+            
+        elif type == 11: # integer array
+            return struct.pack('>i{1}i'.format(len(data)), len(data), data)
+        
         
         
 class NBTFile(NBT):

@@ -21,9 +21,15 @@ class MineBash:
                 self.add_tab(wpath)
                 
         self.win.open.triggered.connect(self.open)
+        self.win.save.triggered.connect(self.save)
         self.win.pastebtn.triggered.connect(lambda: self.paste_chunks(self.win.cliptab, self.win.tabs.currentWidget()))
 
 
+    def save(self):
+        """Save merged data to the current world, overwriting it (so far)."""
+        pass
+    
+    
     def open(self):
         """Open a file dialog and return a world path."""
         wpath = QtGui.QFileDialog.getExistingDirectory()

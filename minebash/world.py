@@ -1,5 +1,7 @@
+import math
 import os
 import struct
+import time
 import zlib
 
 import numpy
@@ -161,6 +163,25 @@ class Region:
             #print "{0}: Reading data at sector {1} ({2}), stated length {3}, actual length {4}".format(
             #    chunk, hex(chunks[chunk]['sectornum']), chunks[chunk]['sectornum'] * 4096, length, len(data))
             return Chunk(zlib.decompress(data))
+        
+        
+    def save_chunks(self, newchunks):
+        oldchunks = self.read_chunks()
+        
+        with open(self.path, 'wb') as rfile:
+            sectorcount = 2
+            for cnum, (cx, cz) in enumerate(oldchunks.keys() | newchunks.keys()):
+                data = newchunks[cx, cz].export()if (cx, cz) in newchunks else oldchunks[cx, cz].export()
+                    
+                rfile.seek(cnum * 4)
+                rfile.write(struct.pack('>i', sectorcount))
+                rfile.seek(cnum * 4 + 4096)
+                rfile.write(struct.pack('>i', int(time.time()) if (cx, cz) in newchunks else self.chunkinfo[cx, cz]))
+                rfile.seek(sectorcount * 4096)
+                rfile.write(struct.pack('>ib', len(data), 2))
+                rfile.write(data)
+                
+                sectorcount += math.ceil(len(data) / 4096.0)
 
 
 
@@ -271,4 +292,10 @@ class AnvilChunk(Chunk):
         for z in range(CSIZE):
             biomes[:, z] = bidata[z * CSIZE:(z + 1) * CSIZE]
         return biomes
+    
+    
+    def export(self):
+        pass
+        
+    
 

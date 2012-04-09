@@ -32,6 +32,7 @@ class MBWindow(QtGui.QMainWindow):
 
         filemenu = self.menuBar().addMenu('File')
         self.open = filemenu.addAction('Open')
+        self.save = filemenu.addAction('Save')
         
         self.tabs = QtGui.QTabWidget(self)
         self.setCentralWidget(self.tabs)
