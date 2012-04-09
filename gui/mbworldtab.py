@@ -115,41 +115,24 @@ class MBWorldTab(QtGui.QWidget):
             self.win.pastebtn.setEnabled(1)
             
             self.win.copylabel.setText('{0} chunks copied from {1}.'.format(len(self.copied), self.world.name))
-
-                
-    def get_clip_chunkmaps(self):
-        """Returns the pixmaps of all the currently selected chunks on this tab."""
-        return {(cx, cz): self.scene.itemAt(cx * self.csize, cz * self.csize).pixmap() for cx, cz in self.copied}
-    
-    
-    def paste_chunks(self):
-        """Grabs the pixmaps of the selected chunks from the copy tab, adds them to this tab's view,
-        and puts this tab into paste mode."""
-        if self.win.cliptab is not None:
-            self.paste = mbpaste.MBPaste(self.world, self.csize)
             
-            # create pasted selection in this view
-            for (cx, cz), chunkmap in self.win.cliptab.get_clip_chunkmaps().iteritems():
-                chunk = mbmapchunk.MBMapChunk(self, (cx, cz), self.csize)
-                chunk.setPixmap(chunkmap)
-                chunk.setPos(cx * self.csize, cz * self.csize)
-                self.scene.addItem(chunk)
-                self.paste.addToGroup(chunk)
-                self.paste.chunks[cx, cz] = chunk
-
-            # show paste and darken view
-            self.scene.addItem(self.paste)
-            self.scene.update()
             
-            # move to pasted selection (and update fully to avoid bugs with darkening)
-            self.view.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
-            self.view.ensureVisible(self.paste)
-            self.view.setViewportUpdateMode(QtGui.QGraphicsView.MinimalViewportUpdate)
-                
-            # clear selection, update gui
-            self.selected.clear()
-            self.win.update_toolbar()
-            self.pastelabel.setText('{0} chunks pasted from {1}.'.format(len(self.paste.chunks), self.win.cliptab.world.name))
+    def add_paste(self, paste):
+        """Adds a pasted selection to the view, and puts the tab into paste mode."""
+        self.paste = paste
+
+        # show paste and darken view
+        self.scene.addItem(self.paste)
+        self.scene.update()
+        
+        # move to pasted selection (and update fully to avoid bugs with darkening)
+        self.view.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
+        self.view.ensureVisible(self.paste)
+        self.view.setViewportUpdateMode(QtGui.QGraphicsView.MinimalViewportUpdate)
+            
+        # clear selection, update gui
+        self.selected.clear()
+        self.pastelabel.setText('{0} chunks pasted from {1}.'.format(len(self.paste.chunks), self.win.cliptab.world.name))
             
             
     def merge_chunks(self):

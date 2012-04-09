@@ -13,7 +13,6 @@ class MBWindow(QtGui.QMainWindow):
         # init tools
         
         self.copybtn.triggered.connect(lambda: self.tabs.currentWidget().copy_chunks())
-        self.pastebtn.triggered.connect(lambda: self.tabs.currentWidget().paste_chunks())
         self.mergebtn.triggered.connect(lambda: self.tabs.currentWidget().merge_chunks())
         self.cancelbtn.triggered.connect(lambda: self.tabs.currentWidget().cancel_merge())
         self.update_toolbar()
