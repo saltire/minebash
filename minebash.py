@@ -65,7 +65,7 @@ class MineBash:
                     tab.scene.addItem(tab.chunks[cx, cz])
                 tab.chunks[cx, cz].setPixmap(pixmap)
             
-        # redraw pasted selection, if any
+        # redraw pasted selection, if any, from its original world
         if tab.paste:
             print 'redrawing pasted chunks from', tab.paste.world.path
             
@@ -73,6 +73,16 @@ class MineBash:
             for rx, rz in tab.paste.world.get_region_list(chunklist):
                 for (cx, cz), pixmap in self.get_region_chunk_pixmaps(tab.paste.world, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist).iteritems():
                     tab.paste.chunks[cx, cz].setPixmap(pixmap)
+                    
+        # redraw merged chunks, if any, from each of their original worlds
+        if tab.merged:
+            print 'redrawing merged chunks'
+            
+            for wld, mchunks in tab.merged.iteritems():
+                chunklist = mchunks.keys()
+                for rx, rz in wld.get_region_list(chunklist):
+                    for (cx, cz), pixmap in self.get_region_chunk_pixmaps(wld, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist).iteritems():
+                        mchunks[cx, cz].setPixmap(pixmap)
                     
         print 'done.'
         
