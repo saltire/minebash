@@ -140,7 +140,10 @@ class MBWorldTab(QtGui.QWidget):
         and allows further editing of the world."""
         for chunk in self.paste.chunks.itervalues():
             cx, cz = int(chunk.scenePos().x() / self.csize), int(chunk.scenePos().y() / self.csize)
-            self.merged.setdefault(self.paste.world, {})[cx, cz] = chunk
+            self.merged[cx, cz] = self.paste.world, chunk
+            #if (cx, cz) in self.chunks:
+                #self.scene.removeItem(self.chunks[cx, cz])
+                #del self.chunks[cx, cz]
             
         self.pastelabel.setText('{0} chunks merged.'.format(len(self.paste.chunks)))
         self.scene.destroyItemGroup(self.paste)

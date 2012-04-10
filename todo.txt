@@ -11,9 +11,9 @@ selection:
 - add clear selection tool
 
 copy and paste:
-- show number of pasted chunks and from which world
 - save a world with merged chunks substituted in
 - rotate a pasted selection
+- disallow copy/pasting between different level formats
 
 rendering:
 - rotation on orthographic map

@@ -22,6 +22,7 @@ class NBT:
     
 class NBTReader(NBT):
     def from_file(self, path):
+        print 'from file'
         with gzip.open(path) as nbtfile:
             return self.from_string(nbtfile.read())
             
@@ -114,6 +115,11 @@ class NBTReader(NBT):
         
         
 class NBTWriter(NBT):
+    def to_file(self, path, tags):
+        with gzip.open(path, 'wb') as nbtfile:
+            nbtfile.write(self.to_string(tags))
+    
+    
     def to_string(self, tags):
         data = ''
         for tag in tags:
@@ -124,8 +130,6 @@ class NBTWriter(NBT):
 
     def _write_tag(self, type, name, payload):
         """Get the binary representation of a tag."""
-        print type, name
-            
         header = struct.pack('>bh{0}b'.format(len(name)), self.types.index(type), len(name), *[ord(x) for x in name])
         return ''.join((header, self._write_tag_payload(self.types.index(type), payload)))
         
@@ -154,7 +158,7 @@ class NBTWriter(NBT):
             return struct.pack('>i{0}b'.format(len(payload)), len(payload), *payload)
 
         elif type == 8: # string
-            return struct.pack('>h{0}b'.format(len(payload)), len(payload), *[ord(x) for x in name])
+            return struct.pack('>h{0}b'.format(len(payload)), len(payload), *[ord(x) for x in payload])
 
         elif type == 9: # list
             subtype, taglist = payload

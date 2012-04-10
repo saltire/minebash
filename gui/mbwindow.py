@@ -2,11 +2,8 @@ from PySide import QtGui
 
 
 class MBWindow(QtGui.QMainWindow):
-    def __init__(self, colours=None, biomes=None):
+    def __init__(self):
         QtGui.QMainWindow.__init__(self)
-        
-        self.colours = colours
-        self.biomes = biomes
         
         self.init_ui()
         

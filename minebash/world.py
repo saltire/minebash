@@ -101,7 +101,7 @@ class World:
     
     
 class Region:
-    def __init__(self, worldpath, (rx, rz), anvil=0):
+    def __init__(self, worldpath, (rx, rz)):
         self.path = os.path.join(worldpath, 'region', 'r.{0}.{1}.mcr'.format(rx, rz))
         self.coords = rx, rz
         self.chunkinfo = self._read_chunk_info()
@@ -122,32 +122,76 @@ class Region:
         """Returns a dict of all chunks in the region (within an optional chunk whitelist),
         indexed by local chunk coordinates."""
         chunklist = self.get_chunk_list(whitelist)
-        if not chunklist:
-            return []
+        if not chunklist or not os.path.exists(self.path):
+            return {}
         
         with open(self.path, 'rb') as rfile:
             return {(cx, cz): self._read_chunk((cx, cz), rfile) for cx, cz in chunklist}
         
         
+    def save(self, wpath, newchunks={}):
+        oldchunks = self.read_chunks()
+        
+        if not os.path.exists(os.path.dirname(self.path)):
+            os.makedirs(os.path.dirname(self.path))
+            
+        print len(newchunks), 'new chunks'
+        print len(oldchunks), 'old chunks'
+        print len(cx for cx, cz in oldchunks if (cx, cz) in newchunks), 'chunks to replace'
+        
+        with open(self.path, 'wb') as rfile:
+            sectorcount = 2
+            for cz in range(RSIZE):
+                for cx in range(RSIZE):
+                    if (cx, cz) in newchunks:
+                        data = newchunks[cx, cz].export()
+                    elif (cx, cz) in oldchunks:
+                        data = oldchunks[cx, cz].export()
+                    else:
+                        continue
+                
+                    cnum = cx + cz * 32
+                    seclength = int(math.ceil(len(data) / 4096.0))
+                        
+                    print 'chunk {0}'.format((cx, cz))
+                    print 'writing offset {0} at {1}'.format(sectorcount, cnum * 4)
+                    rfile.seek(cnum * 4)
+                    rfile.write(struct.pack('>i', sectorcount))
+                    print 'writing mtime at {0}'.format(cnum * 4 + 4096)
+                    rfile.seek(cnum * 4 + 4096)
+                    rfile.write(struct.pack('>i', int(time.time()) if (cx, cz) in newchunks else self.chunkinfo[cx, cz]['mtime']))
+                    print 'writing {0} bytes at {1}'.format(len(data), sectorcount * 4096)
+                    rfile.seek(sectorcount * 4096)
+                    rfile.write(struct.pack('>ib', len(data), 2))
+                    rfile.write(data)
+                    print
+                    
+                    sectorcount += seclength
+        
+        print 'saved.'
+
+
     def _read_chunk_info(self):
         """Returns a dict of chunks that exist in the region file, indexed by coords,
         and containing the modification time and sector offset."""
         rx, rz = self.coords
         chunkinfo = {}
-        with open(self.path, 'rb') as rfile:
-            offsets = struct.unpack_from('>1024i', rfile.read(4096))
-            mtimes = struct.unpack_from('>1024i', rfile.read(4096))
-            for cz in range(RSIZE):
-                for cx in range(RSIZE):
-                    index = cx + cz * RSIZE
-                    offset = offsets[index]
-                    mtime = mtimes[index]
-                    #print '({0}, {1}): Read header {2} at {3}'.format(
-                    #    cx, cz, hex(offset), ((cx + cz * 32) * 4))
-                    sectornum = offset / 256 # first sector of chunk (3 bytes)
-                    sectorlength = offset % 256 # chunk's length in sectors (1 byte)
-                    if sectornum > 0 and sectorlength > 0:
-                        chunkinfo[cx, cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
+        if os.path.exists(self.path):
+            with open(self.path, 'rb') as rfile:
+                offsets = struct.unpack_from('>1024i', rfile.read(4096))
+                mtimes = struct.unpack_from('>1024i', rfile.read(4096))
+                for cz in range(RSIZE):
+                    for cx in range(RSIZE):
+                        index = cx + cz * RSIZE
+                        offset = offsets[index]
+                        mtime = mtimes[index]
+                        #print '({0}, {1}): Read header {2} at {3}'.format(
+                        #    cx, cz, hex(offset), ((cx + cz * 32) * 4))
+                        sectornum = offset / 256 # first sector of chunk (3 bytes)
+                        sectorlength = offset % 256 # chunk's length in sectors (1 byte)
+                        if sectornum > 0 and sectorlength > 0:
+                            chunkinfo[cx, cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
+                            
         return chunkinfo
 
 
@@ -165,25 +209,6 @@ class Region:
             return Chunk(zlib.decompress(data))
         
         
-    def save_chunks(self, newchunks):
-        oldchunks = self.read_chunks()
-        
-        with open(self.path, 'wb') as rfile:
-            sectorcount = 2
-            for cnum, (cx, cz) in enumerate(oldchunks.keys() | newchunks.keys()):
-                data = newchunks[cx, cz].export()if (cx, cz) in newchunks else oldchunks[cx, cz].export()
-                    
-                rfile.seek(cnum * 4)
-                rfile.write(struct.pack('>i', sectorcount))
-                rfile.seek(cnum * 4 + 4096)
-                rfile.write(struct.pack('>i', int(time.time()) if (cx, cz) in newchunks else self.chunkinfo[cx, cz]))
-                rfile.seek(sectorcount * 4096)
-                rfile.write(struct.pack('>ib', len(data), 2))
-                rfile.write(data)
-                
-                sectorcount += math.ceil(len(data) / 4096.0)
-
-
 
 class AnvilRegion(Region):
     def __init__(self, worldpath, (rx, rz)):
@@ -295,7 +320,8 @@ class AnvilChunk(Chunk):
     
     
     def export(self):
-        pass
+        tags = [('Compound', '', [('Compound', 'Level', self.tags)])]
+        return zlib.compress(nbt.NBTWriter().to_string(tags))
         
     
 
