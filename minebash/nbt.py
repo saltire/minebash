@@ -22,7 +22,6 @@ class NBT:
     
 class NBTReader(NBT):
     def from_file(self, path):
-        print 'from file'
         with gzip.open(path) as nbtfile:
             return self.from_string(nbtfile.read())
             
@@ -52,11 +51,11 @@ class NBTReader(NBT):
     def _get_next_tag(self):
         """Get the next tag in the file. Returns (type, name, payload)."""
         type_byte = self._read(1)
-        if type_byte == '':
+        if type_byte == '': # eof
             return None
 
         type = struct.unpack('>b', type_byte)[0]
-        if type == 0:
+        if type == 0: # end tag
             return 0
 
         namelength = struct.unpack('>h', self._read(2))[0]
@@ -107,7 +106,7 @@ class NBTReader(NBT):
                     break
                 compound.append(tag)
             return compound
-        
+
         elif type == 11: # integer array
             length = struct.unpack('>i', self._read(4))[0]
             return struct.unpack('>{0}i'.format(length), self._read(length * 4))
@@ -167,8 +166,8 @@ class NBTWriter(NBT):
                             + [self._write_tag_payload(subtype, tag) for type, name, tag in taglist])
 
         elif type == 10: # compound
-            return ''.join([self._write_tag(*tag) for tag in payload])
-            
+            return ''.join([self._write_tag(*tag) for tag in payload] + [struct.pack('>b', 0)])
+
         elif type == 11: # integer array
             return struct.pack('>i{0}i'.format(len(payload)), len(payload), *payload)
         

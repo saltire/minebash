@@ -46,7 +46,7 @@ class MineBash:
             region = tab.world.get_region((rx, rz))
             if not region:
                 print 'creating new region'
-                region = world.AnvilRegion(tab.world.path, (rx, rz))
+                region = world.Region(tab.world.path, (rx, rz)) # assumes Anvil for now
             
             # save, using new chunks that are in this region
             region.save({(cx % world.RSIZE, cz % world.RSIZE): chunk for (cx, cz), chunk in newchunks.iteritems()
@@ -86,7 +86,7 @@ class MineBash:
         # redraw all chunks on the map (regenerating image cache if specified)
         regions = tab.world.get_region_list()
         for rnum, (rx, rz) in enumerate(regions):
-            print 'region {0} of {1}:'.format(rnum + 1, len(regions))
+            print 'mapping region {0} of {1}:'.format(rnum + 1, len(regions))
             
             for (cx, cz), pixmap in self.get_region_chunk_pixmaps(tab.world, (rx, rz), tab.biomecheck.isChecked(), refresh).iteritems():
                 if (cx, cz) not in tab.chunks:
