@@ -24,27 +24,24 @@ class World:
         self.regionlist = self._read_region_list(force_region)
 
         self.regions = {}
-        self.chunklist = set()
         for rx, rz in self.get_region_list():
             self.regions[rx, rz] = (AnvilRegion if self.anvil else Region)(self.path, (rx, rz))
-            for cx, cz in self.regions[rx, rz].get_chunk_list():
-                self.chunklist.add((rx * RSIZE + cx, rz * RSIZE + cz))
             
             
     def get_chunk_list(self, whitelist=None):
-        """Returns a list of coordinates of all existing chunks (within optional whitelist)."""
-        if whitelist is None:
-            return self.chunklist
-        else:
-            return [(cx, cz) for cx, cz in self.chunklist if (cx, cz) in whitelist]
+        """Returns a list of global coordinates of all existing chunks,
+        within an optional whitelist of global chunk coordinates."""
+        return [(rx * RSIZE + cx, rz * RSIZE + cz)
+                for (rx, rz), region in self.regions.iteritems()
+                    for cx, cz in region.get_chunk_list(whitelist)]
     
     
     def get_chunks(self, whitelist=None):
-        """Returns a dict of all existing chunks (within optional chunk whitelist), indexed by coordinates."""
-        chunks = {}
-        for region in self.regions.values():
-            chunks.update(region.read_chunks(whitelist))
-        return chunks
+        """Returns a dict of all existing chunks, indexed by global chunk coordinates,
+        within an optional whitelist of global chunk coordinates."""
+        return {(rx * RSIZE + cx, rz * RSIZE + cz): chunk
+                for (rx, rz), region in self.regions.iteritems()
+                    for (cx, cz), chunk in region.read_chunks(whitelist).iteritems()}
     
     
     def get_chunk(self, (cx, cz)):
@@ -53,13 +50,20 @@ class World:
     
     
     def get_region_chunk_list(self, (rx, rz), whitelist=None):
-        """Returns a list of LOCAL chunk coordinates existing in the given region file,
-        within an optional whitelist of GLOBAL chunk coordinates.."""
+        """Returns a list of REGIONAL chunk coordinates existing in the given region file,
+        within an optional whitelist of GLOBAL chunk coordinates."""
         return self.regions[rx, rz].get_chunk_list(whitelist)
+    
+    
+    def get_region_chunks(self, (rx, rz), whitelist=None):
+        """Returns a dict of chunks in this region, indexed by REGIONAL chunk coordinates,
+        within an optional whitelist of GLOBAL chunk coordinates."""
+        return self.regions[rx, rz].read_chunks(whitelist)
 
 
     def get_region_list(self, whitelist=None):
-        """Returns a list of coordinates of all existing regions (within optional chunk whitelist)."""
+        """Returns a list of coordinates of all existing regions,
+         within an optional whitelist of global chunk coordinates."""
         if whitelist is None:
             return self.regionlist
         else:
@@ -68,7 +72,8 @@ class World:
         
         
     def get_regions(self, whitelist=None):
-        """Returns a dict of all existing regions (within optional chunk whitelist), indexed by coordinates."""
+        """Returns a dict of all existing regions, indexed by region coordinates,
+        within an optional whitelist of global chunk coordinates."""
         return {(rx, rz): self.regions[rx, rz] for rx, rz in self.get_region_list(whitelist)}
     
     
@@ -108,7 +113,7 @@ class Region:
         
         
     def get_chunk_list(self, whitelist=None):
-        """Returns a list of LOCAL chunk coordinates existing in the region file,
+        """Returns a list of REGIONAL chunk coordinates existing in the region file,
         within an optional whitelist of GLOBAL chunk coordinates."""
         if whitelist is None:
             return self.chunkinfo.keys()
@@ -119,8 +124,8 @@ class Region:
     
     
     def read_chunks(self, whitelist=None):
-        """Returns a dict of all chunks in the region (within an optional chunk whitelist),
-        indexed by local chunk coordinates."""
+        """Returns a dict of all chunks in the region, indexed by REGIONAL chunk coordinates,
+        within an optional whitelist of GLOBAL chunk coordinates."""
         chunklist = self.get_chunk_list(whitelist)
         if not chunklist or not os.path.exists(self.path):
             return {}
