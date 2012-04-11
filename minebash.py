@@ -30,15 +30,26 @@ class MineBash:
 
 
     def save(self):
-        """Save merged data to the current world, overwriting it (so far)."""
+        """Save merged data to the current world, overwriting it (for now)."""
         tab = self.win.tabs.currentWidget()
-        # loop through every region that has merged chunks
-        for rx, rz in set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in tab.merged):
-            print 'saving region', (rx, rz)
+        
+        newchunks = {}
+        for wld, wchunks in tab.merged.iteritems():
+            # get chunks from original world, using original chunk coordinates
+            chunks = wld.get_chunks([wchunk.coords for wchunk in wchunks.itervalues()])
+            # place them in newchunks dict by their new coords
+            newchunks.update({(cx, cz): chunks[wchunk.coords] for (cx, cz), wchunk in wchunks.iteritems()})
+            
+        for rx, rz in set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in wchunks.iterkeys()):
             # load existing region, or create a new one
-            region = tab.world.get_region((rx, rz)) or world.AnvilRegion(tab.world.path, (rx, rz))
-            # save it with merged chunks
-            region.save({(cx % world.RSIZE, cz % world.RSIZE): chunk for (cx, cz), (wld, chunk) in tab.merged.iteritems()
+            print 'saving region', (rx, rz)
+            region = tab.world.get_region((rx, rz))
+            if not region:
+                print 'creating new region'
+                region = world.AnvilRegion(tab.world.path, (rx, rz))
+            
+            # save, using new chunks that are in this region
+            region.save({(cx % world.RSIZE, cz % world.RSIZE): chunk for (cx, cz), chunk in newchunks.iteritems()
                          if (cx / world.RSIZE, cz / world.RSIZE) == (rx, rz)})
     
     
@@ -99,15 +110,16 @@ class MineBash:
             
             # merged chunks are indexed by coords in current tab
             # but images must be generated using coords from original world
-            pixmaps = {}
-            for wld in set(wld for wld, chunk in tab.merged.itervalues()):
-                pixmaps[wld] = {}
-                chunklist = [chunk.coords for w, chunk in tab.merged.itervalues() if w == wld]
+            for wld, wchunks in tab.merged.iteritems():
+                # get original coords of all merged chunks from this world
+                chunklist = [wchunk.coords for wchunk in wchunks.itervalues()]
+                # draw pixmaps for merged chunks from this world, a region at a time
+                pixmaps = {}
                 for rx, rz in wld.get_region_list(chunklist):
-                    pixmaps[wld].update(self.get_region_chunk_pixmaps(wld, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist))
-        
-            for wld, chunk in tab.merged.itervalues():
-                chunk.setPixmap(pixmaps[wld][chunk.coords])
+                    pixmaps.update(self.get_region_chunk_pixmaps(wld, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist))
+                # update merged chunks with pixmaps from their original coords
+                for wchunk in wchunks.itervalues():
+                    wchunk.setPixmap(pixmaps[wchunk.coords])
                 
         print 'done.'
         
