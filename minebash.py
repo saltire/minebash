@@ -41,9 +41,9 @@ class MineBash:
             newchunks.update({(cx, cz): chunks[wchunk.coords] for (cx, cz), wchunk in wchunks.iteritems()})
             
         regionlist = set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in wchunks.iterkeys())
-        for rx, rz in regionlist:
+        for rnum, (rx, rz) in enumerate(regionlist):
             # load existing region, or create a new one
-            print 'saving region', (rx, rz)
+            print 'saving region {0} of {1}:'.format(rnum + 1, len(regionlist), (rx, rz))
             region = tab.world.get_region((rx, rz))
             if not region:
                 print 'creating new region'
@@ -125,6 +125,7 @@ class MineBash:
                     wchunk.setPixmap(pixmaps[wchunk.coords])
                 
         print 'done.'
+        print
         
         
     def paste_chunks(self, ctab, ptab):
