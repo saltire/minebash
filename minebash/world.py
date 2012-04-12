@@ -31,9 +31,9 @@ class World:
     def get_chunk_list(self, whitelist=None):
         """Returns a list of global coordinates of all existing chunks,
         within an optional whitelist of global chunk coordinates."""
-        return [(rx * RSIZE + cx, rz * RSIZE + cz)
+        return set((rx * RSIZE + cx, rz * RSIZE + cz)
                 for (rx, rz), region in self.regions.iteritems()
-                    for cx, cz in region.get_chunk_list(whitelist)]
+                    for cx, cz in region.get_chunk_list(whitelist))
     
     
     def get_chunks(self, whitelist=None):
@@ -68,7 +68,7 @@ class World:
             return self.regionlist
         else:
             region_whitelist = set((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist)
-            return [(rx, rz) for rx, rz in self.regionlist if (rx, rz) in region_whitelist]
+            return set((rx, rz) for rx, rz in self.regionlist if (rx, rz) in region_whitelist)
         
         
     def get_regions(self, whitelist=None):
@@ -85,8 +85,8 @@ class World:
     def _read_region_list(self, force_region=0):
         """Returns a list of coordinates of all regions in the world directory.
         Setting force_region to true forces it to look for the old region format."""
-        anvillist = []
-        regionlist = []
+        anvillist = set()
+        regionlist = set()
         regionpath = os.path.join(self.path, 'region')
         if not os.path.isdir(regionpath):
             print "Dir doesn't exist!"
@@ -95,9 +95,9 @@ class World:
             for filename in os.listdir(regionpath):
                 r, rx, rz, ext = filename.split('.')
                 if r == 'r' and ext == 'mca':
-                    anvillist.append((int(rx), int(rz)))
+                    anvillist.add((int(rx), int(rz)))
                 elif r == 'r' and ext == 'mcr':
-                    regionlist.append((int(rx), int(rz)))
+                    regionlist.add((int(rx), int(rz)))
                     
         self.anvil = True if anvillist and not force_region else False
         print 'World type is {0}'.format('Anvil' if self.anvil else 'McRegion')
@@ -120,8 +120,8 @@ class Region:
             return self.chunkinfo.keys()
         else:
             rx, rz = self.coords
-            return [(cx, cz) for cx, cz in self.chunkinfo.keys()
-                    if (rx * RSIZE + cx, rz * RSIZE + cz) in whitelist]
+            return set((cx, cz) for cx, cz in self.chunkinfo.keys()
+                    if (rx * RSIZE + cx, rz * RSIZE + cz) in whitelist)
     
     
     def read_chunks(self, whitelist=None):
@@ -131,8 +131,6 @@ class Region:
         if not chunklist or not os.path.exists(self.path):
             return {}
         
-        print self.chunkinfo
-        
         print 'reading', self.path
         with open(self.path, 'rb') as rfile:
             return {(cx, cz): self._read_chunk((cx, cz), rfile) for cx, cz in chunklist}
@@ -140,7 +138,6 @@ class Region:
         
     def save(self, newchunks={}):
         print 'doing save'
-        print newchunks
         oldchunks = self.read_chunks()
 
         if not os.path.exists(os.path.dirname(self.path)):
@@ -209,7 +206,6 @@ class Region:
                         if sectornum > 0 and sectorlength > 0:
                             chunkinfo[cx, cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
                             
-        print chunkinfo.keys()                            
         return chunkinfo
     
     
