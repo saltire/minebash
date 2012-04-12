@@ -33,7 +33,7 @@ class OrthoMap(map.Map):
         chunks = region.read_chunks()
         print 'drawing {0} chunks...'.format(len(chunks))
         for (cx, cz), chunk in chunks.iteritems():
-            data = getattr(chunk, 'get_{0}s'.format(type))()
+            data = chunk.get_data(type)
             for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                 bx, bz = (cx * self.csize + x, cz * self.csize + z)
                 if w <= bx <= e and n <= bz <= s:

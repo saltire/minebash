@@ -74,6 +74,7 @@ class MBWorldTab(QtGui.QWidget):
         
         self.biomecheck = QtGui.QCheckBox('Show biomes')
         self.biomecheck.setMinimumSize(80, 30)
+        self.biomecheck.setEnabled(1 if self.world.anvil else 0)
         infolayout.addWidget(self.biomecheck)
 
         
