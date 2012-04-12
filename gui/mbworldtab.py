@@ -6,13 +6,15 @@ import mbpaste
 
 
 class MBWorldTab(QtGui.QWidget):
-    def __init__(self, win, wld, rsize, csize):
+    def __init__(self, win, wld, rsize, csize, biomes):
         QtGui.QWidget.__init__(self)
         
         self.win = win
         self.world = wld
         self.rsize = rsize
         self.csize = csize
+        self.biomenames = biomes
+        self.biomedata = {}
         
         self.chunks = {} # dict of chunks indexed by coords
         self.selected = set() # currently selected chunks in this world
@@ -66,6 +68,10 @@ class MBWorldTab(QtGui.QWidget):
             self.labels[label].setMinimumSize(100, 30)
             infolayout.addWidget(self.labels[label])
             
+        self.biomelabel = QtGui.QLabel('Biome:')
+        self.biomelabel.setMinimumSize(100, 30)
+        infolayout.addWidget(self.biomelabel)
+        
         self.selectlabel = QtGui.QLabel('Chunks selected:')
         self.selectlabel.setMinimumSize(100, 30)
         infolayout.addWidget(self.selectlabel)
@@ -80,8 +86,9 @@ class MBWorldTab(QtGui.QWidget):
         
     def clear_labels(self):
         """Clears the coordinate labels."""
-        for text, label in self.labels.items():
+        for text, label in self.labels.iteritems():
             label.setText('{0}:'.format(text))
+        self.biomelabel.setText('Biome:')
         
         
     def update_labels(self, x, z):
@@ -91,6 +98,8 @@ class MBWorldTab(QtGui.QWidget):
         self.labels['Block'].setText('Block: {0}, {1}'.format(x, z))
         self.labels['Chunk'].setText('Chunk: {0}, {1}'.format(cx, cz))
         self.labels['Region'].setText('Region: {0}, {1}'.format(rx, rz))
+        if self.biomecheck.isChecked():
+            self.biomelabel.setText('Biome: {0}'.format(self.biomenames[self.biomedata[cx, cz][cx % self.csize, cz % self.csize]]))
             
             
     def highlight_chunk(self, (cx, cz)):

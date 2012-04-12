@@ -15,16 +15,18 @@ class MBMapChunk(QtGui.QGraphicsPixmapItem):
         
     def hoverMoveEvent(self, event):
         """Update the coordinate labels when hovering on a chunk area."""
-        pos = event.scenePos()
-        x, z = int(pos.x()), int(pos.y())
-        self.tab.update_labels(x, z)
+        # this event is triggered even if one pixel outside the item for some reason, so fix this
+        if 0 <= event.pos().x() < self.csize and 0 <= event.pos().y() < self.csize:
+            pos = event.scenePos()
+            x, z = int(pos.x()), int(pos.y())
+            self.tab.update_labels(x, z)
         
         
     def hoverLeaveEvent(self, event):
         """Clears the coordinate labels when leaving a chunk area."""
         self.tab.clear_labels()
-
-
+        
+        
     def mousePressEvent(self, event):
         """Sets the selection tools to select or deselect, depending where they click.
         Also handles chunk highlighting if using the brush tool."""

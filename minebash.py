@@ -9,20 +9,29 @@ from gui import mbwindow
 from gui import mbworldtab
 from gui import mbmapchunk
 from gui import mbpaste
+from minebash import nbt
 from minebash import orthomap
 from minebash import world
 
 
 class MineBash:
-    def __init__(self, wpaths=None, colours=None, biomes=None):
-        self.colours = colours
-        self.biomes = biomes
+    def __init__(self, wpaths=None, colourpath=None, biomepath=None):
+        self.colourpath = colourpath if colourpath else 'colours.csv'
+        self.biomepath = biomepath if biomepath else 'biomes.csv'
+        
+        # biome names
+        self.biomes = {}
+        with open(self.biomepath, 'rb') as cfile:
+            for line in cfile.readlines():
+                if line.strip() and line[0] != '#':
+                    values = line.split(',')
+                    self.biomes[int(values[0])] = values[4]
 
         self.win = mbwindow.MBWindow()
 
         if wpaths:
             for wpath in wpaths.split(','):
-                self.add_tab(wpath)
+                self._add_tab(wpath)
                 
         self.win.open.triggered.connect(self.open)
         self.win.save.triggered.connect(self.save)
@@ -61,14 +70,14 @@ class MineBash:
         """Open a file dialog and return a world path."""
         wpath = QtGui.QFileDialog.getExistingDirectory()
         if os.path.exists(os.path.join(wpath, 'level.dat')):
-            self.add_tab(wpath)
+            self._add_tab(wpath)
             
         else:
             print 'Not a world dir!'
             
             
-    def add_tab(self, wpath):
-        tab = mbworldtab.MBWorldTab(self.win, world.World(wpath), world.RSIZE, world.CSIZE)
+    def _add_tab(self, wpath):
+        tab = mbworldtab.MBWorldTab(self.win, world.World(wpath), world.RSIZE, world.CSIZE, self.biomes)
 
         self.draw_map(tab)
 
@@ -81,7 +90,7 @@ class MineBash:
             
     def draw_map(self, tab, refresh=False, regionlist=None):
         """Gets images of all the chunks in the current tab's world, as well as any pasted in,
-         and adds their pixmaps to the view."""
+         and adds their pixmaps to the view. Also refresh metadata."""
          
         # discard chunk list, as we will be reading fresh from the world file
         if refresh:
@@ -95,12 +104,24 @@ class MineBash:
         for rnum, (rx, rz) in enumerate(regions):
             print 'mapping {0} region {1} of {2}:'.format(tab.world.name, rnum + 1, len(regions))
             
-            for (cx, cz), pixmap in self._get_region_chunk_pixmaps(tab.world, (rx, rz), biomes, refresh).iteritems():
+            print 'biome data'
+            if biomes:
+                bdata = self._get_region_biome_data(tab.world, (rx, rz), refresh)
+            print 'pixmaps'
+            pixmaps = self._get_region_chunk_pixmaps(tab.world, (rx, rz), biomes, refresh)
+            for cx, cz in ((rx * world.RSIZE + cx, rz * world.RSIZE + cz)
+                          for cz in range(world.RSIZE) for cx in range(world.RSIZE)
+                              if (cx, cz) in tab.world.get_region_chunk_list((rx, rz))):
+                # create chunk if necessary, and set pixmap
                 if (cx, cz) not in tab.chunks:
                     tab.chunks[cx, cz] = mbmapchunk.MBMapChunk(tab, (cx, cz), tab.csize)
                     tab.chunks[cx, cz].setPos(cx * tab.csize, cz * tab.csize)
                     tab.scene.addItem(tab.chunks[cx, cz])
-                tab.chunks[cx, cz].setPixmap(pixmap)
+                tab.chunks[cx, cz].setPixmap(pixmaps[cx, cz])
+                
+                # set metadata
+                if biomes:
+                    tab.biomedata[cx, cz] = bdata[cx % world.RSIZE, cz % world.RSIZE]
             
         # redraw pasted selection, if any, from its original world
         if tab.paste:
@@ -153,6 +174,24 @@ class MineBash:
             self.win.update_toolbar()
             
             
+    def _get_region_biome_data(self, wld, (rx, rz), refresh=False):
+        #cachepath = os.path.join(os.getcwd(), 'cache', wld.name)
+        #if not os.path.exists(cachepath):
+        #    os.makedirs(cachepath)
+        #path = os.path.join(cachepath, 'bdata_{0}.{1}.txt'.format(rx, rz))
+        #if os.path.exists(path) and not refresh:
+        #    # use cached metadata
+        #    print 'found', path
+        #    bdata = nbt.NBTReader().from_file(path)[0][2]
+        #else:
+        #    # read biome data and cache it
+        #    for (cx, cz), chunk in sorted(tab.world.get_region_chunks((rx, rz)).iteritems()):
+        #        bdata = chunk.get_data('biome')
+        #        tag = ('Byte Array', 'Chunk Biomes', [])
+        #        ...
+        return {(cx, cz): chunk.get_data('biome') for (cx, cz), chunk in wld.get_region_chunks((rx, rz)).iteritems()}
+            
+            
     def _get_region_chunk_pixmaps(self, wld, (rx, rz), biomes=False, refresh=False, whitelist=None):
         """Gets an image of a region and chops it into images of all chunks in the region.
         Returns images as pixmaps. Optionally adds a biome overlay first."""
@@ -185,7 +224,7 @@ class MineBash:
         else:
             # draw a new region image and cache it
             print 'preparing to draw {0} map at region {1}'.format(type, (rx, rz))
-            img = orthomap.OrthoMap(wld, self.colours, self.biomes).draw_region((rx, rz), type)
+            img = orthomap.OrthoMap(wld, self.colourpath, self.biomepath).draw_region((rx, rz), type)
             img.save(path)
             print 'cached', path
 
