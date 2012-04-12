@@ -40,7 +40,8 @@ class MineBash:
             # place them in newchunks dict by their new coords
             newchunks.update({(cx, cz): chunks[wchunk.coords] for (cx, cz), wchunk in wchunks.iteritems()})
             
-        for rx, rz in set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in wchunks.iterkeys()):
+        regionlist = set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in wchunks.iterkeys())
+        for rx, rz in regionlist:
             # load existing region, or create a new one
             print 'saving region', (rx, rz)
             region = tab.world.get_region((rx, rz))
@@ -51,6 +52,8 @@ class MineBash:
             # save, using new chunks that are in this region
             region.save({(cx % world.RSIZE, cz % world.RSIZE): chunk for (cx, cz), chunk in newchunks.iteritems()
                          if (cx / world.RSIZE, cz / world.RSIZE) == (rx, rz)})
+            
+        self.draw_map(tab, refresh=1, regionlist=regionlist)
     
     
     def open(self):
@@ -75,7 +78,7 @@ class MineBash:
         self.win.tabs.setCurrentWidget(tab)
             
             
-    def draw_map(self, tab, refresh=False):
+    def draw_map(self, tab, refresh=False, regionlist=None):
         """Gets images of all the chunks in the current tab's world, as well as any pasted in,
          and adds their pixmaps to the view."""
          
@@ -84,9 +87,9 @@ class MineBash:
             tab.chunks = {}
         
         # redraw all chunks on the map (regenerating image cache if specified)
-        regions = tab.world.get_region_list()
+        regions = set((rx, rz) for (rx, rz) in tab.world.get_region_list() if regionlist is None or (rx, rz) in regionlist)
         for rnum, (rx, rz) in enumerate(regions):
-            print 'mapping region {0} of {1}:'.format(rnum + 1, len(regions))
+            print 'mapping {0} region {1} of {2}:'.format(tab.world.name, rnum + 1, len(regions))
             
             for (cx, cz), pixmap in self.get_region_chunk_pixmaps(tab.world, (rx, rz), tab.biomecheck.isChecked(), refresh).iteritems():
                 if (cx, cz) not in tab.chunks:
