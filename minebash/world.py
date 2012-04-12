@@ -289,47 +289,48 @@ class Chunk:
         
 
 class AnvilChunk(Chunk):
-    def __init__(self, data):
-        self.tags = nbt.NBTReader().from_string(data)[0][2][0][2]
-        
-        
-    def get_data(self, type='block'):
-        if type == 'heightmap':
-            return self.get_heightmap()
-        elif type == 'biome':
-            return self.get_biomes()
-        else:
-            return self.get_blocks()
-        
-        
-    def get_blocks(self):
-        blocks = numpy.zeros((CSIZE, CSIZE, SECHEIGHT * SECTIONS), numpy.uint16) # x, z, y
-        sections = {}
-        for section in [tag[2] for tag in self.find_tag('Sections')[1]]:
-            sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
-        
-        for x in range(CSIZE):
+    def __init__(self, data=None):
+        self.heightmap = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
+        self.biomes = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
+        self.blocks = numpy.zeros((CSIZE, CSIZE, SECHEIGHT * SECTIONS), numpy.uint16) # x, z, y
+
+        if data:
+            self.tags = nbt.NBTReader().from_string(data)[0][2][0][2]
+            
+            # read heightmap
+            hmapdata = self.find_tag('HeightMap')
             for z in range(CSIZE):
-                for s, section in sections.items():
-                    sya = s * SECHEIGHT
-                    syb = sya + SECHEIGHT
-                    start = CSIZE * z + x
-                    # get a Y column from data stored in YZX order
-                    blocks[x, z, sya:syb] = section[start:start + SECHEIGHT * CSIZE * CSIZE:CSIZE * CSIZE]
+                self.heightmap[:, z] = hmapdata[z * CSIZE:(z + 1) * CSIZE]
+            
+            # read biomes
+            bidata = self.find_tag('Biomes')
+            for z in range(CSIZE):
+                self.biomes[:, z] = bidata[z * CSIZE:(z + 1) * CSIZE]
+                
+            # read blocks
+            sections = {}
+            for section in (tag[2] for tag in self.find_tag('Sections')[1]):
+                sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
+            for x in range(CSIZE):
+                for z in range(CSIZE):
+                    for s, section in sections.items():
+                        sya = s * SECHEIGHT
+                        syb = sya + SECHEIGHT
+                        start = CSIZE * z + x
+                        # get a Y column from data stored in YZX order
+                        self.blocks[x, z, sya:syb] = section[start:start + SECHEIGHT * CSIZE * CSIZE:CSIZE * CSIZE]
+            # still have to implement the extra data layer in the anvil format
         
-        # also have to implement the extra data layer in the anvil format
         
-        return blocks
-    
-    
-    def get_biomes(self):
-        bidata = self.find_tag('Biomes')
-        biomes = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
-        for z in range(CSIZE):
-            biomes[:, z] = bidata[z * CSIZE:(z + 1) * CSIZE]
-        return biomes
-    
-    
+    def get_data(self, type='block', coords=None):
+        if type == 'heightmap':
+            return self.heightmap[coords] if coords else self.heightmap
+        elif type == 'biome':
+            return self.biomes[coords] if coords else self.biomes
+        else:
+            return self.blocks[coords] if coords else self.blocks
+        
+        
     def export(self):
         tags = [('Compound', '', [('Compound', 'Level', self.tags)])]
         return nbt.NBTWriter().to_string(tags)
