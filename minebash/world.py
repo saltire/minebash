@@ -153,11 +153,11 @@ class Region:
             for cz in range(RSIZE):
                 for cx in range(RSIZE):
                     if (cx, cz) in newchunks:
-                        data = newchunks[cx, cz].export()
-                        print 'old',
-                    elif (cx, cz) in oldchunks:
-                        data = oldchunks[cx, cz].export()
+                        data = zlib.compress(newchunks[cx, cz].export())
                         print 'new',
+                    elif (cx, cz) in oldchunks:
+                        data = zlib.compress(oldchunks[cx, cz].export())
+                        print 'old',
                     else:
                         continue
                 
@@ -177,7 +177,7 @@ class Region:
                     print '{0} bytes ({1} sectors) at {2} (sector {3})'.format(len(data), sectorlength, sectornum * 4096, sectornum),
                     rfile.seek(sectornum * 4096)
                     rfile.write(struct.pack('>ib', len(data) + 1, version))
-                    rfile.write(zlib.compress(data))
+                    rfile.write(data)
                     print
                     
                     sectornum += sectorlength
@@ -218,8 +218,8 @@ class Region:
         #data = rfile.read(self.chunkinfo[(cx, cz)]['sectorlength'] * 4096 - 5).rstrip('\x00') # this does not trust the length field
 
         if version == 2:
-            #print "{0}: Reading data at sector {1} ({2}), stated length {3}, actual length {4}".format(
-            #    (cx, cz), self.chunkinfo[cx, cz]['sectornum'], self.chunkinfo[cx, cz]['sectornum'] * 4096, length, len(data))
+            print "{0}: Reading data at sector {1} ({2}), stated length {3}, actual length {4}".format(
+                (cx, cz), self.chunkinfo[cx, cz]['sectornum'], self.chunkinfo[cx, cz]['sectornum'] * 4096, length, len(data))
             return AnvilChunk(zlib.decompress(data)) if self.anvil else Chunk(zlib.decompress(data))
         
         
