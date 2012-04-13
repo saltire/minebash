@@ -189,7 +189,7 @@ class Region:
     def _read_chunk_info(self):
         """Returns a dict of chunks that exist in the region file, indexed by coords,
         and containing the modification time and sector offset."""
-        print 'reading header for region', self.coords
+        #print 'reading header for region', self.coords
         rx, rz = self.coords
         chunkinfo = {}
         if os.path.exists(self.path):
@@ -204,8 +204,8 @@ class Region:
                         if offset > 0:
                             sectornum = offset / 256 # first sector of chunk (3 bytes)
                             sectorlength = offset % 256 # chunk's length in sectors (1 byte)
-                            print '{0}: read offset {1} (sector {2}, {3} sectors) at {4}'.format(
-                                (cx, cz), hex(offset), sectornum, sectorlength, hex(cnum * 4))
+                            #print '{0}: read offset {1} (sector {2}, {3} sectors) at {4}'.format(
+                            #    (cx, cz), hex(offset), sectornum, sectorlength, hex(cnum * 4))
                             chunkinfo[cx, cz] = {'sectornum': sectornum, 'sectorlength': sectorlength, 'mtime': mtime}
                             
         return chunkinfo

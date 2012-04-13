@@ -33,14 +33,15 @@ class MineBash:
         """Save merged data to the current world, overwriting it (for now)."""
         tab = self.win.tabs.currentWidget()
         
+        # combine merged chunks from all worlds
         newchunks = {}
-        for wld, wchunks in tab.merged.iteritems():
+        for mworld in set(wld for wld, mchunk in tab.merged.itervalues()):
             # get chunks from original world, using original chunk coordinates
-            chunks = wld.get_chunks([wchunk.coords for wchunk in wchunks.itervalues()])
+            chunks = mworld.get_chunks(set(mchunk.coords for wld, mchunk in tab.merged.itervalues() if wld == mworld))
             # place them in newchunks dict by their new coords
-            newchunks.update({(cx, cz): chunks[wchunk.coords] for (cx, cz), wchunk in wchunks.iteritems()})
-            
-        regionlist = set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in wchunks.iterkeys())
+            newchunks.update({(cx, cz): chunks[mchunk.coords] for (cx, cz), (wld, mchunk) in tab.merged.iteritems()})
+        
+        regionlist = set((cx / world.RSIZE, cz / world.RSIZE) for cx, cz in newchunks.iterkeys())
         for rnum, (rx, rz) in enumerate(regionlist):
             # load existing region, or create a new one
             print 'saving region {0} of {1}:'.format(rnum + 1, len(regionlist), (rx, rz))
@@ -52,8 +53,9 @@ class MineBash:
             # save, using new chunks that are in this region
             region.save({(cx % world.RSIZE, cz % world.RSIZE): chunk for (cx, cz), chunk in newchunks.iteritems()
                          if (cx / world.RSIZE, cz / world.RSIZE) == (rx, rz)})
-            
-        self.draw_map(tab, refresh=1, regionlist=regionlist)
+        
+        tab.merged = {}
+        self.draw_map(tab, refresh=1, whitelist=newchunks.keys())
     
     
     def open(self):
@@ -78,34 +80,33 @@ class MineBash:
         self.win.tabs.setCurrentWidget(tab)
             
             
-    def draw_map(self, tab, refresh=False, regionlist=None):
-        """Gets images of all the chunks in the current tab's world, as well as any pasted in,
-         and adds their pixmaps to the view."""
+    def draw_map(self, tab, refresh=False, whitelist=None):
+        """Gets images of all the chunks in the current tab's world,
+        as well as any pasted or merged in, and adds their pixmaps to the view.
+        Takes an optional chunk whitelist."""
          
         # discard chunk list, as we will be reading fresh from the world file
         if refresh:
             tab.chunks = {}
+            
+        biomes = tab.biomecheck.isChecked()
+            
+        # redraw all chunks on the map that need redrawing (regenerating image cache if specified)
+        print 'drawing map chunks'
+        for (cx, cz), pixmap in self.get_chunk_pixmaps(tab.world, biomes, refresh, whitelist).iteritems():
+            if (cx, cz) not in tab.chunks:
+                tab.chunks[cx, cz] = mbmapchunk.MBMapChunk(tab, (cx, cz), tab.csize)
+                tab.chunks[cx, cz].setPos(cx * tab.csize, cz * tab.csize)
+                tab.chunks[cx, cz].setZValue(1)
+                tab.scene.addItem(tab.chunks[cx, cz])
+            tab.chunks[cx, cz].setPixmap(pixmap)
         
-        # redraw all chunks on the map (regenerating image cache if specified)
-        regions = set((rx, rz) for (rx, rz) in tab.world.get_region_list() if regionlist is None or (rx, rz) in regionlist)
-        for rnum, (rx, rz) in enumerate(regions):
-            print 'mapping {0} region {1} of {2}:'.format(tab.world.name, rnum + 1, len(regions))
-            
-            for (cx, cz), pixmap in self.get_region_chunk_pixmaps(tab.world, (rx, rz), tab.biomecheck.isChecked(), refresh).iteritems():
-                if (cx, cz) not in tab.chunks:
-                    tab.chunks[cx, cz] = mbmapchunk.MBMapChunk(tab, (cx, cz), tab.csize)
-                    tab.chunks[cx, cz].setPos(cx * tab.csize, cz * tab.csize)
-                    tab.scene.addItem(tab.chunks[cx, cz])
-                tab.chunks[cx, cz].setPixmap(pixmap)
-            
         # redraw pasted selection, if any, from its original world
         if tab.paste:
             print 'redrawing pasted chunks from', tab.paste.world.path
             
-            chunklist = tab.paste.chunks.keys()
-            for rx, rz in tab.paste.world.get_region_list(chunklist):
-                for (cx, cz), pixmap in self.get_region_chunk_pixmaps(tab.paste.world, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist).iteritems():
-                    tab.paste.chunks[cx, cz].setPixmap(pixmap)
+            for (cx, cz), pixmap in self.get_chunk_pixmaps(tab.paste.world, biomes, refresh, tab.paste.chunks.keys()).iteritems():
+                tab.paste.chunks[cx, cz].setPixmap(pixmap)
                     
         # redraw merged chunks, if any, from each of their original worlds
         if tab.merged:
@@ -113,16 +114,12 @@ class MineBash:
             
             # merged chunks are indexed by coords in current tab
             # but images must be generated using coords from original world
-            for wld, wchunks in tab.merged.iteritems():
-                # get original coords of all merged chunks from this world
-                chunklist = [wchunk.coords for wchunk in wchunks.itervalues()]
-                # draw pixmaps for merged chunks from this world, a region at a time
-                pixmaps = {}
-                for rx, rz in wld.get_region_list(chunklist):
-                    pixmaps.update(self.get_region_chunk_pixmaps(wld, (rx, rz), tab.biomecheck.isChecked(), refresh, chunklist))
-                # update merged chunks with pixmaps from their original coords
-                for wchunk in wchunks.itervalues():
-                    wchunk.setPixmap(pixmaps[wchunk.coords])
+            for mworld in set(wld for wld, chunk in tab.merged.itervalues()):
+                chunklist, mchunks = zip(*((chunk.coords, chunk) for wld, chunk in tab.merged.itervalues() if wld == mworld))
+                # draw pixmaps for merged chunks from this world, using their original coords
+                pixmaps = self.get_chunk_pixmaps(mworld, biomes, refresh, chunklist)
+                for chunk in mchunks:
+                    chunk.setPixmap(pixmaps[chunk.coords])
                 
         print 'done.'
         print
@@ -135,34 +132,36 @@ class MineBash:
             paste = mbpaste.MBPaste(ctab.world, ptab.csize)
             
             # create pasted selection in this view
-            chunklist = ctab.copied
-            for rx, rz in ctab.world.get_region_list(chunklist):
-                for (cx, cz), pixmap in self.get_region_chunk_pixmaps(ctab.world, (rx, rz), ptab.biomecheck.isChecked(), whitelist=chunklist).iteritems():
-                    chunk = mbmapchunk.MBMapChunk(ptab, (cx, cz), world.CSIZE)
-                    chunk.setPixmap(pixmap)
-                    chunk.setPos(cx * ptab.csize, cz * world.CSIZE)
-                    ptab.scene.addItem(chunk)
-                    paste.addToGroup(chunk)
-                    paste.chunks[cx, cz] = chunk
+            for (cx, cz), pixmap in self.get_chunk_pixmaps(ctab.world, ptab.biomecheck.isChecked(), whitelist=ctab.copied).iteritems():
+                paste.chunks[cx, cz] = mbmapchunk.MBMapChunk(ptab, (cx, cz), world.CSIZE)
+                paste.chunks[cx, cz].setPixmap(pixmap)
+                paste.chunks[cx, cz].setPos(cx * ptab.csize, cz * world.CSIZE)
+                ptab.scene.addItem(paste.chunks[cx, cz])
+                paste.addToGroup(paste.chunks[cx, cz])
                     
             ptab.add_paste(paste)
             self.win.update_toolbar()
             
             
-    def get_region_chunk_pixmaps(self, wld, (rx, rz), biomes=False, refresh=False, whitelist=None):
-        """Gets an image of a region and chops it into images of all chunks in the region.
+    def get_chunk_pixmaps(self, wld, biomes=False, refresh=False, whitelist=None):
+        """Gets images of each region and chops them into images of all chunks in the region.
         Returns images as pixmaps. Optionally adds a biome overlay first."""
-        img = self.get_region_image(wld, (rx, rz), 'block', refresh)
-        if biomes:
-            img = Image.blend(img, self.get_region_image(wld, (rx, rz), 'biome', refresh), 0.5)
+        pixmaps = {}
+        regions = wld.get_region_list(whitelist)
+        for rnum, (rx, rz) in enumerate(regions):
+            print 'mapping {0} region {1} of {2}'.format(wld.name, rnum + 1, len(regions))
+            img = self.get_region_image(wld, (rx, rz), 'block', refresh)
+            if biomes:
+                img = Image.blend(img, self.get_region_image(wld, (rx, rz), 'biome', refresh), 0.5)
             
-        return {(rx * world.RSIZE + cx, rz * world.RSIZE + cz):
-                    QtGui.QPixmap.fromImage(QtGui.QImage(
-                        img.crop((cx * world.CSIZE, cz * world.CSIZE, (cx + 1) * world.CSIZE, (cz + 1) * world.CSIZE)).tostring('raw', 'BGRA'),
-                        world.CSIZE, world.CSIZE, QtGui.QImage.Format_ARGB32))
-                    for cx, cz in wld.get_region_chunk_list((rx, rz), whitelist)}
-    
-    
+            pixmaps.update({(rx * world.RSIZE + cx, rz * world.RSIZE + cz):
+                                QtGui.QPixmap.fromImage(QtGui.QImage(
+                                    img.crop((cx * world.CSIZE, cz * world.CSIZE, (cx + 1) * world.CSIZE, (cz + 1) * world.CSIZE)).tostring('raw', 'BGRA'),
+                                    world.CSIZE, world.CSIZE, QtGui.QImage.Format_ARGB32))
+                                for cx, cz in wld.get_region_chunk_list((rx, rz), whitelist)})
+        return pixmaps
+            
+            
     def get_region_image(self, wld, (rx, rz), type='block', refresh=False, whitelist=None):
         """Returns an image of a region. Will use cached images if available, unless refresh specified.
         Caches images in a subdirectory for the current world."""

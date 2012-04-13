@@ -22,7 +22,7 @@ class OrthoMap(map.Map):
         
         
     def _generate_region_map(self, region, type='block', bcrop=None):
-        if type not in ('block', 'height', 'biome'):
+        if type not in ('block', 'heightmap', 'biome'):
             type = 'block'
             
         size = self.rsize * self.csize
@@ -37,9 +37,18 @@ class OrthoMap(map.Map):
             for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                 bx, bz = (cx * self.csize + x, cz * self.csize + z)
                 if w <= bx <= e and n <= bz <= s:
-                    pixels[bx, bz] = getattr(self, '_get_{0}_colour'.format(type))(data[x, z])
+                    pixels[bx, bz] = self._get_colour(type, data[x, z])
         
         return image
+    
+    
+    def _get_colour(self, type, index):
+        if type == 'heightmap':
+            return (index, index, index)
+        elif type == 'biome':
+            return self.biomes[index]
+        else:
+            return self._get_block_colour(index)
                 
                 
     def _get_block_colour(self, column):
@@ -48,14 +57,6 @@ class OrthoMap(map.Map):
                 return self._get_block_column_colour(column, y)
                 
                 
-    def _get_height_colour(self, height):
-        return (height, height, height)
-        
-        
-    def _get_biome_colour(self, biome):
-        return self.biomes[biome]
-    
-    
     def _get_block_column_colour(self, column, y):
         """If a block is partially transparent, combine its colour with that of the block below."""
         top = self.colours[column[y]][:4]

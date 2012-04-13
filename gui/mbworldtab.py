@@ -74,6 +74,7 @@ class MBWorldTab(QtGui.QWidget):
         
         self.biomecheck = QtGui.QCheckBox('Show biomes')
         self.biomecheck.setMinimumSize(80, 30)
+        self.biomecheck.setEnabled(self.world.anvil)
         infolayout.addWidget(self.biomecheck)
 
         
@@ -86,7 +87,7 @@ class MBWorldTab(QtGui.QWidget):
     def update_labels(self, x, z):
         """Updates coordinate labels with the region, chunk, and block under the mouse cursor."""
         cx, cz = x / self.csize, z / self.csize
-        rx, rz = cx / self.csize, cz / self.csize
+        rx, rz = cx / self.rsize, cz / self.rsize
         self.labels['Block'].setText('Block: {0}, {1}'.format(x, z))
         self.labels['Chunk'].setText('Chunk: {0}, {1}'.format(cx, cz))
         self.labels['Region'].setText('Region: {0}, {1}'.format(rx, rz))
@@ -140,7 +141,9 @@ class MBWorldTab(QtGui.QWidget):
         and allows further editing of the world."""
         for chunk in self.paste.chunks.itervalues():
             cx, cz = int(chunk.scenePos().x() / self.csize), int(chunk.scenePos().y() / self.csize)
-            self.merged.setdefault(self.paste.world, {})[cx, cz] = chunk
+            chunk.setZValue(2)
+            self.merged[cx, cz] = self.paste.world, chunk
+            #self.merged.setdefault(self.paste.world, {})[cx, cz] = chunk
             #if (cx, cz) in self.chunks:
                 #self.scene.removeItem(self.chunks[cx, cz])
                 #del self.chunks[cx, cz]

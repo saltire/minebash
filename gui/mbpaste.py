@@ -9,6 +9,8 @@ class MBPaste(QtGui.QGraphicsItemGroup):
         self.csize = csize
         self.chunks = {}
         
+        self.setZValue(3)
+
         
     def mousePressEvent(self, event):
         """Records the starting point of a mouse drag on the pasted selection."""
