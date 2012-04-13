@@ -14,9 +14,9 @@ class Map:
         self.biomes = self._load_colours(biomes or 'biomes.csv')
         
         
-    def draw_map(self, imgpath, bcrop=None):
+    def draw_map(self, imgpath, type='block', bcrop=None):
         """Gets map data from a subclass method, and saves it to an image file."""
-        image = self._generate_map(bcrop=bcrop)
+        image = self._generate_map(type, bcrop)
         image.save(imgpath)
         print 'saved image to', imgpath
         

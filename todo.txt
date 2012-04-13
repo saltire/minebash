@@ -1,6 +1,7 @@
 
 program:
 - add exceptions when invalid world folders are passed
+- add threading so the GUI doesn't lock up when processing data
 
 cache:
 - cache worlds by path rather than by name, possibly inside the world folder

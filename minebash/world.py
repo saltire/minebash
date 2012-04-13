@@ -67,8 +67,8 @@ class World:
         if whitelist is None:
             return self.regionlist
         else:
-            region_whitelist = set((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist)
-            return set((rx, rz) for rx, rz in self.regionlist if (rx, rz) in region_whitelist)
+            return set((rx, rz) for rx, rz in self.regionlist
+                       if (rx, rz) in set((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist))
         
         
     def get_regions(self, whitelist=None):
@@ -152,10 +152,10 @@ class Region:
                 for cx in range(RSIZE):
                     if (cx, cz) in newchunks:
                         data = zlib.compress(newchunks[cx, cz].export())
-                        print 'new',
+                        #print 'new',
                     elif (cx, cz) in oldchunks:
                         data = zlib.compress(oldchunks[cx, cz].export())
-                        print 'old',
+                        #print 'old',
                     else:
                         continue
                 
@@ -165,20 +165,20 @@ class Region:
                     mtime = int(time.time()) if (cx, cz) in newchunks else self.chunkinfo[cx, cz]['mtime']
                     self.chunkinfo[cx, cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
                         
-                    print 'chunk {0}:'.format((cx, cz)),
-                    print 'offset {0} at {1},'.format(hex(offset), hex(cnum * 4)),
+                    #print 'chunk {0}:'.format((cx, cz)),
+                    #print 'offset {0} at {1},'.format(hex(offset), hex(cnum * 4)),
                     rfile.seek(cnum * 4)
                     rfile.write(struct.pack('>i', offset))
                     
-                    print 'mtime at {0},'.format(hex(cnum * 4 + 4096)),
+                    #print 'mtime at {0},'.format(hex(cnum * 4 + 4096)),
                     rfile.seek(cnum * 4 + 4096)
                     rfile.write(struct.pack('>i', mtime))
                     
-                    print '{0} bytes ({1} sectors) at {2} (sector {3})'.format(len(data), sectorlength, hex(sectornum * 4096), sectornum),
+                    #print '{0} bytes ({1} sectors) at {2} (sector {3})'.format(len(data), sectorlength, hex(sectornum * 4096), sectornum),
                     rfile.seek(sectornum * 4096)
                     rfile.write(struct.pack('>ib', len(data) + 1, version))
                     rfile.write(data)
-                    print
+                    #print
                     
                     sectornum += sectorlength
                     
@@ -298,45 +298,55 @@ class AnvilChunk(Chunk):
     
     def get_data(self, type='block', coords=None):
         if type == 'heightmap':
-            data = self._get_heightmap()
+            data = self._get_chunk_array('HeightMap')
         elif type == 'biome':
-            data = self._get_biomes()
+            data = self._get_chunk_array('Biomes')
+        elif type == 'blocklight':
+            data = self._get_block_array('BlockLight', 4)
+        elif type == 'skylight':
+            data = self._get_block_array('SkyLight', 4)
+        elif type == 'blockdata':
+            data = self._get_block_array('Data', 4)
         else:
             data = self._get_blocks()
             
         return data[coords] if coords else data
-        
-        
-    def _get_heightmap(self):
-        heightmap = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
-        hmapdata = self.find_tag('HeightMap')
-        for z in range(CSIZE):
-            heightmap[:, z] = hmapdata[z * CSIZE:(z + 1) * CSIZE]
-        return heightmap
-        
     
-    def _get_biomes(self):
-        biomes = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
-        bidata = self.find_tag('Biomes')
+    
+    def _get_chunk_array(self, tagname):
+        array = numpy.zeros((CSIZE, CSIZE), numpy.ubyte) # x, z
+        data = self.find_tag(tagname)
         for z in range(CSIZE):
-            biomes[:, z] = bidata[z * CSIZE:(z + 1) * CSIZE]
-        return biomes
-            
-
-    def _get_blocks(self):
-        blocks = numpy.zeros((CSIZE, CSIZE, SECHEIGHT * SECTIONS), numpy.uint16) # x, z, y
+            array[:, z] = data[z * CSIZE:(z + 1) * CSIZE]
+        return array
+        
+        
+    def _get_block_array(self, tagname, bits=8):
+        array = numpy.zeros((CSIZE, CSIZE, SECHEIGHT * SECTIONS), numpy.uint16) # x, z, y
         sections = {}
         for section in (tag[2] for tag in self.find_tag('Sections')[1]):
-            sections[self.find_tag('Y', section)] = self.find_tag('Blocks', section)
+            sections[self.find_tag('Y', section)] = self.find_tag(tagname, section)
         for x in range(CSIZE):
             for z in range(CSIZE):
                 for s, section in sections.items():
-                    sya = s * SECHEIGHT
-                    syb = sya + SECHEIGHT
+                    sy = s * SECHEIGHT
                     start = CSIZE * z + x
                     # get a Y column from data stored in YZX order
-                    blocks[x, z, sya:syb] = section[start:start + SECHEIGHT * CSIZE * CSIZE:CSIZE * CSIZE]
+                    if bits == 8:
+                        section_y = section[start:start + SECHEIGHT * CSIZE * CSIZE:CSIZE * CSIZE]
+                    if bits == 4:
+                        section_y = []
+                        for y in range(SECHEIGHT):
+                            byte = section[start + y / 2 * CSIZE * CSIZE]
+                            #if byte != 0:
+                            #    print bin(byte)
+                            section_y.append(byte % 16 if y % 2 else byte / 16)
+                    array[x, z, sy:sy + SECHEIGHT] = section_y
+        return array
+            
+
+    def _get_blocks(self):
         # still have to implement the extra data layer in the anvil format
-        return blocks
+        return self._get_block_array('Blocks')
 
 

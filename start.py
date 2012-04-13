@@ -9,10 +9,9 @@ if __name__ == '__main__':
     argp.add_argument('--world', '-w')
     argp.add_argument('--colours', '-c')
     argp.add_argument('--biomes', '-b')
+    argp.add_argument('--output', '-o')
+    argp.add_argument('--type', '-t')
     
     args = argp.parse_args()
     
-    wpath = args.world or 'd:\\games\\Minecraft\\server\\loreland' # temp default
-    
-    wld = world.World(wpath)
-    orthomap.OrthoMap(wld, 'colours.csv').draw_map('map-ortho.png')
+    orthomap.OrthoMap(world.World(args.world), args.colours, args.biomes).draw_map(args.output, args.type)

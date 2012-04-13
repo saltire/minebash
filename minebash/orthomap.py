@@ -6,15 +6,17 @@ class OrthoMap(map.Map):
     def _generate_map(self, type='block', bcrop=None):
         """Generate a single image with a top-down map of this world,
         optionally cropped to a bounding box. North is at the top."""
-        chunklist = self._crop_coords(self.world.get_chunk_list(), bcrop)
-        regions = self.world.get_regions(self._scale_coords_down(chunklist, self.rsize))
+        if bcrop:
+            print 'cropping map to {0} W, {1} E, {2} N, {3} S'.format(*bcrop)
+        chunklist = self._crop_coords(self.world.get_chunk_list(), bcrop, self.csize)
         w, e, n, s = self._scale_edges_up(self._get_edges(chunklist), self.csize) if bcrop is None else bcrop
-        
+
         width, height = e + 1 - w, s + 1 - n
         image = Image.new('RGBA', (width, height))
         
+        regions = self.world.get_regions(chunklist)
         for rnum, ((rx, rz), region) in enumerate(sorted(regions.iteritems())):
-            print 'reading region {0}/{1} {2}...'.format(rnum + 1, len(regions), (rx, rz))
+            print 'reading region {0} of {1} {2}...'.format(rnum + 1, len(regions), (rx, rz))
             bx, bz = rx * self.rsize * self.csize - w, rz * self.rsize * self.csize - n
             image.paste(self._generate_region_map(region, type, (w, e, n, s)), (bx, bz))
             
@@ -22,21 +24,19 @@ class OrthoMap(map.Map):
         
         
     def _generate_region_map(self, region, type='block', bcrop=None):
-        if type not in ('block', 'heightmap', 'biome'):
-            type = 'block'
-            
+        rx, rz = region.coords
         size = self.rsize * self.csize
-        w, e, n, s = bcrop if bcrop else (0, size - 1, 0, size - 1)
+        w, e, n, s = bcrop or (rx * size, (rx + 1) * size - 1, rz * size, (rz + 1) * size - 1)
         image = Image.new('RGBA', (size, size))
         pixels = image.load()
         
-        chunks = region.read_chunks()
+        chunks = region.read_chunks(set((x / self.csize, z / self.csize) for x in range(w, e + 1) for z in range(n, s + 1)))
         print 'drawing {0} chunks...'.format(len(chunks))
         for (cx, cz), chunk in chunks.iteritems():
             data = chunk.get_data(type)
             for (x, z) in ((x, z) for x in range(self.csize) for z in range(self.csize)):
                 bx, bz = (cx * self.csize + x, cz * self.csize + z)
-                if w <= bx <= e and n <= bz <= s:
+                if w <= rx * size + bx <= e and n <= rz * size + bz <= s:
                     pixels[bx, bz] = self._get_colour(type, data[x, z])
         
         return image

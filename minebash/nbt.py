@@ -54,11 +54,11 @@ class NBTReader(NBT):
         if type_byte == '': # eof
             return None
 
-        type = struct.unpack('>b', type_byte)[0]
+        type = struct.unpack('>B', type_byte)[0]
         if type == 0: # end tag
             return 0
 
-        namelength = struct.unpack('>h', self._read(2))[0]
+        namelength = struct.unpack('>H', self._read(2))[0]
         name = self._read(namelength)
 
         return self.types[type], name, self._get_tag_payload(type)
@@ -67,16 +67,16 @@ class NBTReader(NBT):
     def _get_tag_payload(self, type):
         """Get the payload of a tag."""
         if type == 1: # byte
-            return struct.unpack('>b', self._read(1))[0]
+            return struct.unpack('>B', self._read(1))[0]
 
         elif type == 2: # short
-            return struct.unpack('>h', self._read(2))[0]
+            return struct.unpack('>H', self._read(2))[0]
 
         elif type == 3: # int
-            return struct.unpack('>i', self._read(4))[0]
+            return struct.unpack('>I', self._read(4))[0]
 
         elif type == 4: # long
-            return struct.unpack('>q', self._read(8))[0]
+            return struct.unpack('>Q', self._read(8))[0]
 
         elif type == 5: # float
             return struct.unpack('>f', self._read(4))[0]
@@ -85,16 +85,16 @@ class NBTReader(NBT):
             return struct.unpack('>d', self._read(8))[0]
 
         elif type == 7: # byte array
-            length = struct.unpack('>i', self._read(4))[0]
-            return struct.unpack('>{0}b'.format(length), self._read(length))
+            length = struct.unpack('>I', self._read(4))[0]
+            return struct.unpack('>{0}B'.format(length), self._read(length))
 
         elif type == 8: # string
-            length = struct.unpack('>h', self._read(2))[0]
+            length = struct.unpack('>H', self._read(2))[0]
             #return unicode(file.read(length), 'utf-8')
             return self._read(length)
 
         elif type == 9: # list
-            subtype, length = struct.unpack('>bi', self._read(5))
+            subtype, length = struct.unpack('>BI', self._read(5))
             taglist = [(self.types[subtype], '', self._get_tag_payload(subtype)) for i in range(length)]
             return self.types[subtype], taglist
 
@@ -108,8 +108,8 @@ class NBTReader(NBT):
             return compound
 
         elif type == 11: # integer array
-            length = struct.unpack('>i', self._read(4))[0]
-            return struct.unpack('>{0}i'.format(length), self._read(length * 4))
+            length = struct.unpack('>I', self._read(4))[0]
+            return struct.unpack('>{0}I'.format(length), self._read(length * 4))
         
         
         
@@ -129,23 +129,23 @@ class NBTWriter(NBT):
 
     def _write_tag(self, type, name, payload):
         """Get the binary representation of a tag."""
-        header = struct.pack('>bh{0}b'.format(len(name)), self.types.index(type), len(name), *[ord(x) for x in name])
+        header = struct.pack('>BH{0}B'.format(len(name)), self.types.index(type), len(name), *[ord(x) for x in name])
         return ''.join((header, self._write_tag_payload(self.types.index(type), payload)))
         
         
     def _write_tag_payload(self, type, payload):
         """Get a binary representation of a tag payload."""
         if type == 1: # byte
-            return struct.pack('>b', payload)
+            return struct.pack('>B', payload)
 
         elif type == 2: # short
-            return struct.pack('>h', payload)
+            return struct.pack('>H', payload)
 
         elif type == 3: # int
-            return struct.pack('>i', payload)
+            return struct.pack('>I', payload)
 
         elif type == 4: # long
-            return struct.pack('>q', payload)
+            return struct.pack('>Q', payload)
 
         elif type == 5: # float
             return struct.pack('>f', payload)
@@ -154,22 +154,22 @@ class NBTWriter(NBT):
             return struct.pack('>d', payload)
 
         elif type == 7: # byte array
-            return struct.pack('>i{0}b'.format(len(payload)), len(payload), *payload)
+            return struct.pack('>I{0}B'.format(len(payload)), len(payload), *payload)
 
         elif type == 8: # string
-            return struct.pack('>h{0}b'.format(len(payload)), len(payload), *[ord(x) for x in payload])
+            return struct.pack('>H{0}B'.format(len(payload)), len(payload), *[ord(x) for x in payload])
 
         elif type == 9: # list
             subtype, taglist = payload
             subtype = self.types.index(subtype)
-            return ''.join([struct.pack('>bi', subtype, len(taglist))]
+            return ''.join([struct.pack('>BI', subtype, len(taglist))]
                             + [self._write_tag_payload(subtype, tag) for type, name, tag in taglist])
 
         elif type == 10: # compound
-            return ''.join([self._write_tag(*tag) for tag in payload] + [struct.pack('>b', 0)])
+            return ''.join([self._write_tag(*tag) for tag in payload] + [struct.pack('>B', 0)])
 
         elif type == 11: # integer array
-            return struct.pack('>i{0}i'.format(len(payload)), len(payload), *payload)
+            return struct.pack('>I{0}I'.format(len(payload)), len(payload), *payload)
         
         
         
