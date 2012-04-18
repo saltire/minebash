@@ -242,8 +242,9 @@ class Chunk:
 
     def find_tag(self, name, container=None):
         """Find the first tag with the given name."""
-        container = container if container is not None else self.tags
-        return [tag[2] for tag in container if tag[1] == name][0]
+        for tag in (container if container is not None else self.tags):
+            if tag[1] == name:
+                return tag[2]
     
     
     def get_data(self, type='block'):
@@ -324,7 +325,7 @@ class AnvilChunk(Chunk):
     def _get_block_array(self, tagname, bits=8):
         array = numpy.zeros((CSIZE, CSIZE, SECHEIGHT * SECTIONS), numpy.uint16) # x, z, y
         sections = {}
-        for section in (tag[2] for tag in self.find_tag('Sections')[1]):
+        for section in (tag[2] for tag in self.find_tag('Sections')):
             sections[self.find_tag('Y', section)] = self.find_tag(tagname, section)
         for x in range(CSIZE):
             for z in range(CSIZE):

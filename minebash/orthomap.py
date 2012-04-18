@@ -3,12 +3,12 @@ from PIL import Image, ImageDraw
 import map
 
 class OrthoMap(map.Map):
-    def _generate_map(self, type='block', bcrop=None):
+    def _generate_map(self, wld, type='block', bcrop=None):
         """Generate a single image with a top-down map of this world,
         optionally cropped to a bounding box. North is at the top."""
         if bcrop:
             print 'cropping map to {0} W, {1} E, {2} N, {3} S'.format(*bcrop)
-        chunklist = self._crop_coords(self.world.get_chunk_list(), bcrop, self.csize)
+        chunklist = self._crop_coords(wld.get_chunk_list(), bcrop, self.csize)
         w, e, n, s = self._scale_edges_up(self._get_edges(chunklist), self.csize) if bcrop is None else bcrop
 
         width, height = e + 1 - w, s + 1 - n
@@ -52,7 +52,7 @@ class OrthoMap(map.Map):
                 
                 
     def _get_block_colour(self, column):
-        for y in reversed(range(self.height)):
+        for y in reversed(range(len(column))):
             if column[y]:
                 return self._get_block_column_colour(column, y)
                 

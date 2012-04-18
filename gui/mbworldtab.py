@@ -108,18 +108,15 @@ class MBWorldTab(QtGui.QWidget):
         self.win.copybtn.setEnabled(1 if self.selected else 0)
         
         
-    def copy_chunks(self):
-        """Sets this tab as the current tab to copy from, and enables the paste tool."""
-        if self.selected:
-            self.win.cliptab = self
-            self.copied = self.selected.copy()
-            self.win.pastebtn.setEnabled(1)
-            
-            self.win.copylabel.setText('{0} chunks copied from {1}.'.format(len(self.copied), self.world.name))
-            
-            
-    def add_paste(self, paste):
+    def paste_chunks(self, ctab):
         """Adds a pasted selection to the view, and puts the tab into paste mode."""
+        paste = mbpaste.MBPaste(ctab.world, self.csize)
+        for cx, cz in ctab.copied:
+            chunk = mbmapchunk.MBMapChunk(self, (cx, cz), self.csize)
+            chunk.setPos(cx * self.csize, cz * self.csize)
+            self.scene.addItem(chunk)
+            paste.addToGroup(chunk)
+            paste.chunks[cx, cz] = chunk
         self.paste = paste
 
         # show paste and darken view
@@ -165,6 +162,5 @@ class MBWorldTab(QtGui.QWidget):
         self.paste = None
         self.scene.update()
         self.win.update_toolbar()
-        
         
         

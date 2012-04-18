@@ -96,7 +96,7 @@ class NBTReader(NBT):
         elif type == 9: # list
             subtype, length = struct.unpack('>BI', self._read(5))
             taglist = [(self.types[subtype], '', self._get_tag_payload(subtype)) for i in range(length)]
-            return self.types[subtype], taglist
+            return taglist
 
         elif type == 10: # compound
             compound = []
@@ -160,10 +160,9 @@ class NBTWriter(NBT):
             return struct.pack('>H{0}B'.format(len(payload)), len(payload), *[ord(x) for x in payload])
 
         elif type == 9: # list
-            subtype, taglist = payload
-            subtype = self.types.index(subtype)
-            return ''.join([struct.pack('>BI', subtype, len(taglist))]
-                            + [self._write_tag_payload(subtype, tag) for type, name, tag in taglist])
+            subtype = self.types.index(payload[0][0])
+            return ''.join([struct.pack('>BI', subtype, len(payload))]
+                            + [self._write_tag_payload(subtype, tag) for type, name, tag in payload])
 
         elif type == 10: # compound
             return ''.join([self._write_tag(*tag) for tag in payload] + [struct.pack('>B', 0)])
