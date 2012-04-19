@@ -36,31 +36,12 @@ class World:
                     for cx, cz in region.get_chunk_list(whitelist))
     
     
-    def get_chunks(self, whitelist=None):
-        """Returns a dict of all existing chunks, indexed by global chunk coordinates,
-        within an optional whitelist of global chunk coordinates."""
-        return {(rx * RSIZE + cx, rz * RSIZE + cz): chunk
-                for (rx, rz), region in self.regions.iteritems()
-                    for (cx, cz), chunk in region.read_chunks(whitelist).iteritems()}
-    
-    
-    def get_chunk(self, (cx, cz)):
-        """Get a single chunk, from the appropriate region."""
-        return self.regions[rx, rz].read_chunks([(cx, cz)])
-    
-    
     def get_region_chunk_list(self, (rx, rz), whitelist=None):
         """Returns a list of REGIONAL chunk coordinates existing in the given region file,
         within an optional whitelist of GLOBAL chunk coordinates."""
         return self.regions[rx, rz].get_chunk_list(whitelist)
     
     
-    def get_region_chunks(self, (rx, rz), whitelist=None):
-        """Returns a dict of chunks in this region, indexed by REGIONAL chunk coordinates,
-        within an optional whitelist of GLOBAL chunk coordinates."""
-        return self.regions[rx, rz].read_chunks(whitelist)
-
-
     def get_region_list(self, whitelist=None):
         """Returns a list of coordinates of all existing regions,
          within an optional whitelist of global chunk coordinates."""
@@ -71,15 +52,56 @@ class World:
                        if (rx, rz) in set((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist))
         
         
+    def get_chunk(self, (cx, cz)):
+        """Get a single chunk, from the appropriate region."""
+        return self.regions[rx, rz].read_chunks([(cx, cz)])
+    
+    
+    def get_chunks(self, whitelist=None):
+        """Returns a dict of all existing chunks, indexed by global chunk coordinates,
+        within an optional whitelist of global chunk coordinates."""
+        return {(rx * RSIZE + cx, rz * RSIZE + cz): chunk
+                for (rx, rz), region in self.regions.iteritems()
+                    for (cx, cz), chunk in region.read_chunks(whitelist).iteritems()}
+    
+    
+    def get_region_chunks(self, (rx, rz), whitelist=None):
+        """Returns a dict of chunks in this region, indexed by REGIONAL chunk coordinates,
+        within an optional whitelist of GLOBAL chunk coordinates."""
+        return self.regions[rx, rz].read_chunks(whitelist)
+
+
+    def get_region(self, (rx, rz)):
+        """Returns a region at a specific coordinate, if it exists."""
+        return self.regions[rx, rz] if (rx, rz) in self.regions else None
+    
+    
     def get_regions(self, whitelist=None):
         """Returns a dict of all existing regions, indexed by region coordinates,
         within an optional whitelist of global chunk coordinates."""
         return {(rx, rz): self.regions[rx, rz] for rx, rz in self.get_region_list(whitelist)}
     
     
-    def get_region(self, (rx, rz)):
-        """Returns a region at a specific coordinate, if it exists."""
-        return self.regions[rx, rz] if (rx, rz) in self.regions else None
+    def get_players(self):
+        """Returns a list of players along with their current coordinates."""
+        ppath = os.path.join(self.path, 'players')
+        if not os.path.isdir(ppath):
+            print 'Not a multiplayer world!'
+            
+        else:
+            players = {}
+            for pfile in os.listdir(ppath):
+                pname, ext = pfile.split('.')
+                if ext == 'dat':
+                    pdata = nbt.NBTReader().from_file(os.path.join(ppath, pfile))[0][2]
+                    # obviously we can reference more data here as it is needed
+                    players[pname] = {
+                        'pos': tuple(y[2] for x in pdata if x[1] == 'Pos' for y in x[2])}
+            return players
+    
+    
+    def _read_level_data(self):
+        return nbt.NBTReader().from_file(os.path.join(self.path, 'level.dat'))[0][2][0][2]
     
     
     def _read_region_list(self, force_region=0):
