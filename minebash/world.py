@@ -52,23 +52,23 @@ class World:
                        if (rx, rz) in set((cx / RSIZE, cz / RSIZE) for (cx, cz) in whitelist))
         
         
-    def get_chunk(self, (cx, cz)):
+    def get_chunk(self, (cx, cz), raw=False):
         """Get a single chunk, from the appropriate region."""
-        return self.regions[rx, rz].read_chunks([(cx, cz)])
+        return self.regions[rx, rz].read_chunks([(cx, cz)], raw)
     
     
-    def get_chunks(self, whitelist=None):
+    def get_chunks(self, whitelist=None, raw=False):
         """Returns a dict of all existing chunks, indexed by global chunk coordinates,
         within an optional whitelist of global chunk coordinates."""
         return {(rx * RSIZE + cx, rz * RSIZE + cz): chunk
                 for (rx, rz), region in self.regions.iteritems()
-                    for (cx, cz), chunk in region.read_chunks(whitelist).iteritems()}
+                    for (cx, cz), chunk in region.read_chunks(whitelist, raw).iteritems()}
     
     
-    def get_region_chunks(self, (rx, rz), whitelist=None):
+    def get_region_chunks(self, (rx, rz), whitelist=None, raw=False):
         """Returns a dict of chunks in this region, indexed by REGIONAL chunk coordinates,
         within an optional whitelist of GLOBAL chunk coordinates."""
-        return self.regions[rx, rz].read_chunks(whitelist)
+        return self.regions[rx, rz].read_chunks(whitelist, raw)
 
 
     def get_region(self, (rx, rz)):
@@ -145,7 +145,7 @@ class Region:
                     if (rx * RSIZE + cx, rz * RSIZE + cz) in whitelist)
     
     
-    def read_chunks(self, whitelist=None):
+    def read_chunks(self, whitelist=None, raw=False):
         """Returns a dict of all chunks in the region, indexed by REGIONAL chunk coordinates,
         within an optional whitelist of GLOBAL chunk coordinates."""
         chunklist = self.get_chunk_list(whitelist)
@@ -154,12 +154,12 @@ class Region:
         
         print 'reading', self.path
         with open(self.path, 'rb') as rfile:
-            return {(cx, cz): self._read_chunk((cx, cz), rfile)
+            return {(cx, cz): self._read_chunk((cx, cz), rfile, raw)
                     for cz in range(RSIZE) for cx in range(RSIZE) if (cx, cz) in chunklist}
         
         
     def save(self, newchunks={}):
-        oldchunks = self.read_chunks()
+        oldchunks = self.read_chunks(raw=True)
 
         if not os.path.exists(os.path.dirname(self.path)):
             os.makedirs(os.path.dirname(self.path))
@@ -173,10 +173,12 @@ class Region:
             for cz in range(RSIZE):
                 for cx in range(RSIZE):
                     if (cx, cz) in newchunks:
-                        data = zlib.compress(newchunks[cx, cz].export())
+                        mtime, data = newchunks[cx, cz]
+                        #data = zlib.compress(newchunks[cx, cz].export())
                         #print 'new',
                     elif (cx, cz) in oldchunks:
-                        data = zlib.compress(oldchunks[cx, cz].export())
+                        mtime, data = oldchunks[cx, cz]
+                        #data = zlib.compress(oldchunks[cx, cz].export())
                         #print 'old',
                     else:
                         continue
@@ -184,7 +186,7 @@ class Region:
                     cnum = cx + cz * RSIZE
                     sectorlength = int(math.ceil((len(data) + 4) / 4096.0))
                     offset = (sectornum << 8) | (sectorlength & 0xff)
-                    mtime = int(time.time()) if (cx, cz) in newchunks else self.chunkinfo[cx, cz]['mtime']
+                    #mtime = int(time.time()) if (cx, cz) in newchunks else self.chunkinfo[cx, cz]['mtime']
                     self.chunkinfo[cx, cz] = {'mtime': mtime, 'sectornum': sectornum, 'sectorlength': sectorlength}
                         
                     #print 'chunk {0}:'.format((cx, cz)),
@@ -229,11 +231,11 @@ class Region:
                             #print '{0}: read offset {1} (sector {2}, {3} sectors) at {4}'.format(
                             #    (cx, cz), hex(offset), sectornum, sectorlength, hex(cnum * 4))
                             chunkinfo[cx, cz] = {'sectornum': sectornum, 'sectorlength': sectorlength, 'mtime': mtime}
-                            
+                           
         return chunkinfo
     
     
-    def _read_chunk(self, (cx, cz), rfile):
+    def _read_chunk(self, (cx, cz), rfile, raw=False):
         #print '{0}: reading chunk at sector {1} ({2}),'.format(
         #    (cx, cz), self.chunkinfo[cx, cz]['sectornum'], hex(self.chunkinfo[cx, cz]['sectornum'] * 4096)),
             
@@ -247,10 +249,13 @@ class Region:
         #print 'data length {0} bytes'.format(len(data))
 
         if version == 2:
-            try:
-                return AnvilChunk(zlib.decompress(data)) if self.anvil else Chunk(zlib.decompress(data))
-            except zlib.error as error:
-                print '\nzlib error with chunk {0}: {1}\n'.format((cx, cz), error)
+            if raw:
+                return self.chunkinfo[cx, cz]['mtime'], data
+            else:
+                try:
+                    return AnvilChunk(zlib.decompress(data)) if self.anvil else Chunk(zlib.decompress(data))
+                except zlib.error as error:
+                    print '\nzlib error with chunk {0}: {1}\n'.format((cx, cz), error)
         else:
             print 'chunk {0}: wrong version {1} at offset {2}'.format((cx, cz), version, hex(self.chunkinfo[cx, cz]['sectornum'] * 4096))
         

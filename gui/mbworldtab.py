@@ -44,8 +44,10 @@ class MBWorldTab(QtGui.QWidget):
         # chunk groups to act as layers, each with its own z-value
         
         self.chunkgrp = QtGui.QGraphicsItemGroup()
+        self.scene.addItem(self.chunkgrp)
         self.chunkgrp.setZValue(1)
         self.mergegrp = QtGui.QGraphicsItemGroup()
+        self.scene.addItem(self.mergegrp)
         self.mergegrp.setZValue(2)
         self.paste = None # a pasted, unmerged selection of chunks
         
@@ -151,7 +153,7 @@ class MBWorldTab(QtGui.QWidget):
             self.merged[cx, cz] = self.paste.world, chunk
             
         self.pastelabel.setText('{0} chunks merged.'.format(len(self.paste.chunks)))
-        self.scene.destroyItemGroup(self.paste)
+        #self.scene.destroyItemGroup(self.paste)
         self.paste = None
         self.scene.update()
         self.win.update_toolbar()

@@ -36,7 +36,7 @@ class MineBash:
         newchunks = {}
         for mworld in set(wld for wld, mchunk in tab.merged.itervalues()):
             # get chunks from original world, using original chunk coordinates
-            chunks = mworld.get_chunks(set(mchunk.coords for wld, mchunk in tab.merged.itervalues() if wld == mworld))
+            chunks = mworld.get_chunks(set(mchunk.coords for wld, mchunk in tab.merged.itervalues() if wld == mworld), raw=True)
             # place them in newchunks dict by their new coords
             newchunks.update({(cx, cz): chunks[mchunk.coords] for (cx, cz), (wld, mchunk) in tab.merged.iteritems()})
         
