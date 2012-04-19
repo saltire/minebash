@@ -112,17 +112,29 @@ class MineBash:
 
         biomes = tab.biomecheck.isChecked()
             
-        # redraw all chunks on the map that need redrawing (regenerating image cache if specified)
         if not paste_only:
+            # redraw all chunks on the map that need redrawing (regenerating image cache if specified)
             print 'drawing map chunks'
             for (cx, cz), pixmap in self._get_chunk_pixmaps(tab.world, biomes, refresh, whitelist).iteritems():
                 if (cx, cz) not in tab.chunks:
                     tab.chunks[cx, cz] = mbmapchunk.MBMapChunk(tab, (cx, cz), tab.csize)
                     tab.chunks[cx, cz].setPos(cx * tab.csize, cz * tab.csize)
-                    tab.chunks[cx, cz].setZValue(1)
                     tab.scene.addItem(tab.chunks[cx, cz])
                 tab.chunks[cx, cz].setPixmap(pixmap)
         
+            # redraw merged chunks, if any, from each of their original worlds
+            if tab.merged and not paste_only:
+                print 'redrawing merged chunks'
+                
+                # merged chunks are indexed by coords in current tab
+                # but images must be generated using coords from original world
+                for mworld in set(wld for wld, chunk in tab.merged.itervalues()):
+                    chunklist, mchunks = zip(*((chunk.coords, chunk) for wld, chunk in tab.merged.itervalues() if wld == mworld))
+                    # draw pixmaps for merged chunks from this world, using their original coords
+                    pixmaps = self._get_chunk_pixmaps(mworld, biomes, refresh, chunklist)
+                    for chunk in mchunks:
+                        chunk.setPixmap(pixmaps[chunk.coords])
+                
         # redraw pasted selection, if any, from its original world
         if tab.paste:
             print 'redrawing pasted chunks from', tab.paste.world.path
@@ -130,19 +142,6 @@ class MineBash:
             for (cx, cz), pixmap in self._get_chunk_pixmaps(tab.paste.world, biomes, refresh, tab.paste.chunks.keys()).iteritems():
                 tab.paste.chunks[cx, cz].setPixmap(pixmap)
                     
-        # redraw merged chunks, if any, from each of their original worlds
-        if tab.merged and not paste_only:
-            print 'redrawing merged chunks'
-            
-            # merged chunks are indexed by coords in current tab
-            # but images must be generated using coords from original world
-            for mworld in set(wld for wld, chunk in tab.merged.itervalues()):
-                chunklist, mchunks = zip(*((chunk.coords, chunk) for wld, chunk in tab.merged.itervalues() if wld == mworld))
-                # draw pixmaps for merged chunks from this world, using their original coords
-                pixmaps = self._get_chunk_pixmaps(mworld, biomes, refresh, chunklist)
-                for chunk in mchunks:
-                    chunk.setPixmap(pixmaps[chunk.coords])
-                
         print 'done.'
         print
         

@@ -14,12 +14,13 @@ class MBWorldTab(QtGui.QWidget):
         self.rsize = rsize
         self.csize = csize
         
-        self.chunks = {} # dict of chunks indexed by coords
+        self.chunks = {} # dict of chunks, indexed by coords
+        self.merged = {} # dict of merged chunks as (world, chunk) tuples, indexed by coords
+        
         self.selected = set() # currently selected chunks in this world
         self.copied = set() # last copied chunks in this world
+
         self.select = True # whether tools will select or deselect chunks
-        self.paste = None # a pasted, unmerged selection of chunks
-        self.merged = {} # dict of merged chunk info
         
         self.init_ui()
 
@@ -33,12 +34,20 @@ class MBWorldTab(QtGui.QWidget):
         self.scene.setBackgroundBrush(QtGui.QColor(25, 25, 25))
         
         self.view = mbmapview.MBMapView(self.scene, self)
+        mainlayout.addWidget(self.view)
         
         tools = QtGui.QFrame(self)
         info = QtGui.QFrame(self)
-        mainlayout.addWidget(self.view)
-        mainlayout.addWidget(info)
         mainlayout.addWidget(tools)
+        mainlayout.addWidget(info)
+        
+        # chunk groups to act as layers, each with its own z-value
+        
+        self.chunkgrp = QtGui.QGraphicsItemGroup()
+        self.chunkgrp.setZValue(1)
+        self.mergegrp = QtGui.QGraphicsItemGroup()
+        self.mergegrp.setZValue(2)
+        self.paste = None # a pasted, unmerged selection of chunks
         
         # tools row
         
@@ -138,12 +147,8 @@ class MBWorldTab(QtGui.QWidget):
         and allows further editing of the world."""
         for chunk in self.paste.chunks.itervalues():
             cx, cz = int(chunk.scenePos().x() / self.csize), int(chunk.scenePos().y() / self.csize)
-            chunk.setZValue(2)
+            self.mergegrp.addToGroup(chunk)
             self.merged[cx, cz] = self.paste.world, chunk
-            #self.merged.setdefault(self.paste.world, {})[cx, cz] = chunk
-            #if (cx, cz) in self.chunks:
-                #self.scene.removeItem(self.chunks[cx, cz])
-                #del self.chunks[cx, cz]
             
         self.pastelabel.setText('{0} chunks merged.'.format(len(self.paste.chunks)))
         self.scene.destroyItemGroup(self.paste)
