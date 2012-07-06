@@ -54,7 +54,7 @@ class World:
         
     def get_chunk(self, (cx, cz), raw=False):
         """Get a single chunk, from the appropriate region."""
-        return self.regions[rx, rz].read_chunks([(cx, cz)], raw)
+        return self.regions[cx / RSIZE, cz / RSIZE].read_chunks([(cx, cz)], raw)
     
     
     def get_chunks(self, whitelist=None, raw=False):
